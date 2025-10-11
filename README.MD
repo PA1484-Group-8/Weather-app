@@ -126,3 +126,7 @@ From LilyGO [link](https://github.com/Xinyuan-LilyGO/LilyGo-AMOLED-Series)
      - Windows: `C:\Users\{username}\Documents\Arduino`
      - macOS: `/Users/{username}/Documents/Arduino`
      - Linux: `/home/{username}/Arduino`
+
+
+
+Assar är här
