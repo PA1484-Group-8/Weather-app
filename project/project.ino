@@ -8,140 +8,176 @@
 #include <LV_Helper.h>
 #include <lvgl.h>
 
-// Wi-Fi credentials (Delete these before commiting to GitHub)
-static const char* WIFI_SSID     = "SSID";
-static const char* WIFI_PASSWORD = "PWD";
+// Wi-Fi credentials
+static const char* WIFI_SSID     = "ssid";
+static const char* WIFI_PASSWORD = "password";
 
 LilyGo_Class amoled;
 
 static lv_obj_t* tileview;
 static lv_obj_t* t1;
 static lv_obj_t* t2;
+static lv_obj_t* t3;       // Tile #3
 static lv_obj_t* t1_label;
 static lv_obj_t* t2_label;
-static bool t2_dark = false;  // start tile #2 in light mode
+static lv_obj_t* t3_label;
+static bool t2_dark = false;            // start tile #2 in light mode
+static bool wifi_was_connected = false; // track Wi-Fi connection
+static unsigned long last_wifi_update = 0; // track last Wi-Fi update time
 
 // Function: Tile #2 Color change
 static void apply_tile_colors(lv_obj_t* tile, lv_obj_t* label, bool dark)
 {
-  // Background
-  lv_obj_set_style_bg_opa(tile, LV_OPA_COVER, 0);
-  lv_obj_set_style_bg_color(tile, dark ? lv_color_black() : lv_color_white(), 0);
-
-  // Text
-  lv_obj_set_style_text_color(label, dark ? lv_color_white() : lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(tile, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(tile, dark ? lv_color_black() : lv_color_white(), 0);
+    lv_obj_set_style_text_color(label, dark ? lv_color_white() : lv_color_black(), 0);
 }
 
+// Tile #2 click toggle
 static void on_tile2_clicked(lv_event_t* e)
 {
-  LV_UNUSED(e);
-  t2_dark = !t2_dark;
-  apply_tile_colors(t2, t2_label, t2_dark);
+    LV_UNUSED(e);
+    t2_dark = !t2_dark;
+    apply_tile_colors(t2, t2_label, t2_dark);
 }
 
-// Function: Boot screen
+// Function: Polished 3-second boot screen
 static void show_boot_screen()
 {
-  lv_obj_t* boot_label = lv_label_create(lv_scr_act());
-  lv_label_set_text_fmt(boot_label, "Group 8\nFirmware v1.0.0");
-  lv_obj_set_style_text_font(boot_label, &lv_font_montserrat_28, 0);
-  lv_obj_center(boot_label);
+    lv_obj_t* scr = lv_scr_act();
 
-  // Show for 3 seconds
-  lv_timer_handler();
-  delay(3000);
+    // Black background
+    lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
 
-  // Remove the boot label
-  lv_obj_clean(lv_scr_act());
+    // Label: Name, Group, Firmware
+    lv_obj_t* label = lv_label_create(scr);
+    lv_label_set_text_fmt(label, "Group 8\nFirmware v1.2.0");
+    lv_obj_set_style_text_font(label, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_color(label, lv_color_white(), 0);
+    lv_obj_center(label);
+
+    // Horizontal progress line
+    lv_obj_t* bar = lv_bar_create(scr);
+    lv_obj_set_size(bar, 220, 8);
+    lv_obj_align(bar, LV_ALIGN_BOTTOM_MID, 0, -50);
+    lv_bar_set_range(bar, 0, 100);
+    lv_bar_set_value(bar, 0, LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(bar, lv_color_white(), 0);
+
+    // Animate line over exactly 3 seconds
+    const unsigned long duration_ms = 3000;
+    unsigned long startTime = millis();
+
+    while (millis() - startTime < duration_ms)
+    {
+        unsigned long elapsed = millis() - startTime;
+        int lineValue = (elapsed * 100) / duration_ms;
+        if (lineValue > 100) lineValue = 100;
+
+        lv_bar_set_value(bar, lineValue, LV_ANIM_OFF);
+        lv_timer_handler();
+        delay(5);
+    }
+
+    lv_obj_clean(scr); // clear before main UI
 }
 
+// Function: Update Wi-Fi status on Tile #3 (non-blocking, smooth)
+static void update_wifi_status()
+{
+    wl_status_t current_status = WiFi.status();
+
+    if (current_status == WL_CONNECTED && !wifi_was_connected)
+    {
+        IPAddress ip = WiFi.localIP();
+        char buf[64];
+        snprintf(buf, sizeof(buf), "Wi-Fi: %s\nIP: %d.%d.%d.%d", 
+                 WiFi.SSID().c_str(),
+                 ip[0], ip[1], ip[2], ip[3]);
+        lv_label_set_text(t3_label, buf);
+        lv_obj_center(t3_label); // only center once
+        wifi_was_connected = true;
+    }
+    else if (current_status != WL_CONNECTED && wifi_was_connected)
+    {
+        lv_label_set_text(t3_label, "Wi-Fi: Connecting...");
+        lv_obj_center(t3_label);
+        wifi_was_connected = false;
+    }
+    // If status hasn't changed, do nothing → no redraw → smooth
+}
 
 // Function: Creates UI
 static void create_ui()
 {
-  // Fullscreen Tileview
-  tileview = lv_tileview_create(lv_scr_act());
-  lv_obj_set_size(tileview, lv_disp_get_hor_res(NULL), lv_disp_get_ver_res(NULL));
-  lv_obj_set_scrollbar_mode(tileview, LV_SCROLLBAR_MODE_OFF);
+    tileview = lv_tileview_create(lv_scr_act());
+    lv_obj_set_size(tileview, lv_disp_get_hor_res(NULL), lv_disp_get_ver_res(NULL));
+    lv_obj_set_scrollbar_mode(tileview, LV_SCROLLBAR_MODE_OFF);
 
-  // Add three horizontal tiles
-  t1 = lv_tileview_add_tile(tileview, 0, 0, LV_DIR_HOR);
-  t2 = lv_tileview_add_tile(tileview, 1, 0, LV_DIR_HOR);
-  lv_obj_t* t3 = lv_tileview_add_tile(tileview, 2, 0, LV_DIR_HOR); // New tile
+    // Add three horizontal tiles
+    t1 = lv_tileview_add_tile(tileview, 0, 0, LV_DIR_HOR);
+    t2 = lv_tileview_add_tile(tileview, 1, 0, LV_DIR_HOR);
+    t3 = lv_tileview_add_tile(tileview, 2, 0, LV_DIR_HOR); // Wi-Fi tile
 
-  // Tile #1
-  {
+    // Tile #1
     t1_label = lv_label_create(t1);
     lv_label_set_text(t1_label, "Hello Students");
     lv_obj_set_style_text_font(t1_label, &lv_font_montserrat_28, 0);
     lv_obj_center(t1_label);
-    apply_tile_colors(t1, t1_label, /*dark=*/false);
-  }
+    apply_tile_colors(t1, t1_label, false);
 
-  // Tile #2
-  {
+    // Tile #2
     t2_label = lv_label_create(t2);
     lv_label_set_text(t2_label, "Welcome to the workshop");
     lv_obj_set_style_text_font(t2_label, &lv_font_montserrat_28, 0);
     lv_obj_center(t2_label);
-
-    apply_tile_colors(t2, t2_label, /*dark=*/false);
+    apply_tile_colors(t2, t2_label, false);
     lv_obj_add_flag(t2, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(t2, on_tile2_clicked, LV_EVENT_CLICKED, NULL);
-  }
 
-  // Tile #3 (New)
-  {
-    lv_obj_t* t3_label = lv_label_create(t3);
-    lv_label_set_text(t3_label, "test");
+    // Tile #3 (Wi-Fi status)
+    t3_label = lv_label_create(t3);
+    lv_label_set_text(t3_label, "Wi-Fi: Connecting...");
     lv_obj_set_style_text_font(t3_label, &lv_font_montserrat_28, 0);
     lv_obj_center(t3_label);
-
-    apply_tile_colors(t3, t3_label, /*dark=*/false);
-  }
+    apply_tile_colors(t3, t3_label, false);
 }
 
-// Function: Connects to WIFI
-static void connect_wifi()
-{
-  Serial.printf("Connecting to WiFi SSID: %s\n", WIFI_SSID);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-  const uint32_t start = millis();
-  while (WiFi.status() != WL_CONNECTED && (millis() - start) < 15000) {
-    delay(250);
-  }
-  Serial.println();
-
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("WiFi connected.");
-  } else {
-    Serial.println("WiFi could not connect (timeout).");
-  }
-}
-
-// Must have function: Setup is run once on startup
+// Must-have setup function
 void setup()
 {
-  Serial.begin(115200);
-  delay(200);
+    Serial.begin(115200);
+    delay(200);
 
-  if (!amoled.begin()) {
-    Serial.println("Failed to init LilyGO AMOLED.");
-    while (true) delay(1000);
-  }
+    if (!amoled.begin()) {
+        Serial.println("Failed to init LilyGO AMOLED.");
+        while (true) delay(1000);
+    }
 
-  beginLvglHelper(amoled);   // init LVGL for this board
+    beginLvglHelper(amoled);
 
-  show_boot_screen();        // NEW: show boot screen first
-  create_ui();               // then build the tile UI
-  connect_wifi();
+    // Show boot screen for 3 seconds
+    show_boot_screen();
+
+    // Create main UI
+    create_ui();
+
+    // Connect Wi-Fi once (non-blocking)
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    Serial.printf("Connecting to WiFi SSID: %s\n", WIFI_SSID);
 }
 
-// Must have function: Loop runs continously on device after setup
+// Loop continuously
 void loop()
 {
-  lv_timer_handler();
-  delay(5);
+    lv_timer_handler(); // handle LVGL updates frequently
+
+    // Update Wi-Fi status every 500ms without blocking
+    if (millis() - last_wifi_update > 500)
+    {
+        update_wifi_status();
+        last_wifi_update = millis();
+    }
 }
