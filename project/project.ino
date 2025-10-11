@@ -39,6 +39,23 @@ static void on_tile2_clicked(lv_event_t* e)
   apply_tile_colors(t2, t2_label, t2_dark);
 }
 
+// Function: Boot screen
+static void show_boot_screen()
+{
+  lv_obj_t* boot_label = lv_label_create(lv_scr_act());
+  lv_label_set_text_fmt(boot_label, "Group 8\nFirmware v1.0.0");
+  lv_obj_set_style_text_font(boot_label, &lv_font_montserrat_28, 0);
+  lv_obj_center(boot_label);
+
+  // Show for 3 seconds
+  lv_timer_handler();
+  delay(3000);
+
+  // Remove the boot label
+  lv_obj_clean(lv_scr_act());
+}
+
+
 // Function: Creates UI
 static void create_ui()
 {
@@ -47,9 +64,10 @@ static void create_ui()
   lv_obj_set_size(tileview, lv_disp_get_hor_res(NULL), lv_disp_get_ver_res(NULL));
   lv_obj_set_scrollbar_mode(tileview, LV_SCROLLBAR_MODE_OFF);
 
-  // Add two horizontal tiles
+  // Add three horizontal tiles
   t1 = lv_tileview_add_tile(tileview, 0, 0, LV_DIR_HOR);
   t2 = lv_tileview_add_tile(tileview, 1, 0, LV_DIR_HOR);
+  lv_obj_t* t3 = lv_tileview_add_tile(tileview, 2, 0, LV_DIR_HOR); // New tile
 
   // Tile #1
   {
@@ -70,6 +88,16 @@ static void create_ui()
     apply_tile_colors(t2, t2_label, /*dark=*/false);
     lv_obj_add_flag(t2, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(t2, on_tile2_clicked, LV_EVENT_CLICKED, NULL);
+  }
+
+  // Tile #3 (New)
+  {
+    lv_obj_t* t3_label = lv_label_create(t3);
+    lv_label_set_text(t3_label, "test");
+    lv_obj_set_style_text_font(t3_label, &lv_font_montserrat_28, 0);
+    lv_obj_center(t3_label);
+
+    apply_tile_colors(t3, t3_label, /*dark=*/false);
   }
 }
 
@@ -106,7 +134,8 @@ void setup()
 
   beginLvglHelper(amoled);   // init LVGL for this board
 
-  create_ui();
+  show_boot_screen();        // NEW: show boot screen first
+  create_ui();               // then build the tile UI
   connect_wifi();
 }
 
