@@ -127,6 +127,3 @@ From LilyGO [link](https://github.com/Xinyuan-LilyGO/LilyGo-AMOLED-Series)
      - macOS: `/Users/{username}/Documents/Arduino`
      - Linux: `/home/{username}/Arduino`
 
-
-
-Assar är här

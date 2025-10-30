@@ -9,8 +9,8 @@
 #include <lvgl.h>
 
 // Wi-Fi credentials
-static const char* WIFI_SSID     = "ssid";
-static const char* WIFI_PASSWORD = "password";
+static const char* WIFI_SSID     = "AN";
+static const char* WIFI_PASSWORD = "3feC=Mic@iKsi&Da";
 
 LilyGo_Class amoled;
 
@@ -22,8 +22,14 @@ static lv_obj_t* t1_label;
 static lv_obj_t* t2_label;
 static lv_obj_t* t3_label;
 static bool t2_dark = false;            // start tile #2 in light mode
-static bool wifi_was_connected = false; // track Wi-Fi connection
+
+// track Wi-Fi connection, whenever you need to access the internet you need to check that this is true.
+static bool wifi_was_connected = false; 
 static unsigned long last_wifi_update = 0; // track last Wi-Fi update time
+
+static unsigned long last_weather_update = 0;
+static const long WEATHER_UPDATE_INTERVAL = 1 * 60 * 1000; // Update weather every minute (in milliseconds)
+
 
 // Function: Tile #2 Color change
 static void apply_tile_colors(lv_obj_t* tile, lv_obj_t* label, bool dark)
@@ -144,6 +150,97 @@ static void create_ui()
     apply_tile_colors(t3, t3_label, false);
 }
 
+
+/**
+ * @brief Fetches weather data from SMHI API, documentation: https://opendata.smhi.se/metobs/introduction.
+ */
+static void fetchWeatherData()
+{
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        Serial.println("Cannot fetch weather, Wi-Fi not connected.");
+        lv_label_set_text(t1_label, "Wi-Fi is disconnected.\nCannot fetch weather.");
+        lv_obj_center(t1_label);
+        return;
+    }
+
+    Serial.println("Fetching weather data...");
+    lv_label_set_text(t1_label, "Fetching weather data...");
+    lv_obj_center(t1_label);
+
+    HTTPClient http;
+    char api_url[256];
+
+    String version = "1.0";
+    String parameter = "1"; // Lufttemperatur
+    String station = "65090"; // Karlskrona-Söderstjerna
+    String period = "latest-hour";
+
+    // https://opendata-download-metobs.smhi.se/api/version/1.0/parameter/1/station/65090/period/latest-hour/data.json
+    // Construct the API URL
+    snprintf(api_url, sizeof(api_url),
+             "https://opendata-download-metobs.smhi.se/api/version/%s/parameter/%s/station/%s/period/%s/data.json",
+             version.c_str(), parameter.c_str(), station.c_str(), period.c_str());
+
+    Serial.printf("API URL: %s\n", api_url);
+
+    if (http.begin(api_url))
+    {
+        int httpCode = http.GET();
+
+        if (httpCode == HTTP_CODE_OK)
+        {
+            String payload = http.getString();
+            Serial.println("API Response:");
+            Serial.println(payload);
+
+            // Parse the JSON response
+            DynamicJsonDocument doc(2048); // Allocate space for the JSON document
+            DeserializationError error = deserializeJson(doc, payload);
+
+            if (error)
+            {
+                Serial.print("deserializeJson() failed: ");
+                Serial.println(error.c_str());
+                lv_label_set_text(t1_label, "Failed to parse\nweather data.");
+                lv_obj_center(t1_label);
+            }
+            else
+            {
+                
+                // Extract data
+                const char* temp = doc["value"][0]["value"];
+                // Format the output string
+                char weather_buf[256];
+                snprintf(weather_buf, sizeof(weather_buf),
+                         "Karlskrona\n"
+                         "%s °C\n",
+                         temp);
+
+                // Update Tile #1 label
+                lv_label_set_text(t1_label, weather_buf);
+                lv_obj_center(t1_label);
+            }
+        }
+        else
+        {
+            Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+            char error_buf[100];
+            snprintf(error_buf, sizeof(error_buf), "HTTP Error: %d\nCheck API Key?", httpCode);
+            lv_label_set_text(t1_label, error_buf);
+            lv_obj_center(t1_label);
+        }
+
+        http.end();
+    }
+    else
+    {
+        Serial.printf("[HTTP] Unable to connect to %s\n", api_url);
+        lv_label_set_text(t1_label, "Failed to connect\nto weather server.");
+        lv_obj_center(t1_label);
+    }
+}
+
 // Must-have setup function
 void setup()
 {
@@ -166,7 +263,9 @@ void setup()
     // Connect Wi-Fi once (non-blocking)
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
     Serial.printf("Connecting to WiFi SSID: %s\n", WIFI_SSID);
+    last_weather_update = 0; // Set to 0 to trigger an immediate update on first connection
 }
 
 // Loop continuously
@@ -179,5 +278,10 @@ void loop()
     {
         update_wifi_status();
         last_wifi_update = millis();
+    }
+    if (wifi_was_connected && (millis() - last_weather_update > WEATHER_UPDATE_INTERVAL || last_weather_update == 0))
+    {
+        fetchWeatherData();
+        last_weather_update = millis();
     }
 }
