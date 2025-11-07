@@ -328,7 +328,6 @@ static void create_ui()
 
 /**
  * @brief Updates all UI labels with data from global variables.
- * THIS IS THE FUNCTION YOU ASKED FOR.
  */
 void update_ui()
 {
@@ -549,7 +548,7 @@ void loop()
 
         // Update historical last months global object.
         String historicalLastMonths_url = "https://opendata-download-metobs.smhi.se/api/version/1.0/parameter/2/station/65090/period/latest-months/data.json";
-        DynamicJsonDocument historicalDoc(16536); // 64k, on the heap
+        DynamicJsonDocument historicalDoc(16536);
         if (fetchJsonFromServer(historicalLastMonths_url, historicalDoc))
         {
             JsonArray days = historicalDoc["value"].as<JsonArray>();
