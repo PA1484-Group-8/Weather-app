@@ -15,17 +15,17 @@ static const char *WIFI_PASSWORD = "password";
 LilyGo_Class amoled;
 
 static lv_obj_t *tileview;
+static lv_obj_t *t0; // Boot screen tile
 static lv_obj_t *t1;
 static lv_obj_t *t2;
 static lv_obj_t *t3;
-static lv_obj_t *t4;
 
+static lv_obj_t *t0_label; // Boot screen label
 static lv_obj_t *t1_label;
 static lv_obj_t *t2_label;
 static lv_obj_t *t3_label;
-static lv_obj_t *t4_label;
 
-static bool t2_dark = false; // start tile #2 in light mode
+static bool t1_dark = false; // start tile #1 (forecast) in light mode
 
 // track Wi-Fi connection, whenever you need to access the internet you need to check that this is true.
 static bool wifi_was_connected = false;
@@ -174,9 +174,6 @@ struct DailyAverageTemp
     char time[11];
 };
 
-// The temperature of the most recent hour. (In karlskrona)
-float currentHourlyTemp = -99.9;
-
 // Holds the weather forcast for the next 7 days. The object holds an array of 7 elements. Each element is a `ForcastHourlyWeather` object with the forcast for the temperature at 12:00pm daytime that day.
 struct
 {
@@ -195,7 +192,7 @@ struct
 
 } lastMonthsAverageTemps;
 
-// Function: Tile #2 Color change
+// Function: Tile Color change
 static void apply_tile_colors(lv_obj_t *tile, lv_obj_t *label, bool dark)
 {
     lv_obj_set_style_bg_opa(tile, LV_OPA_COVER, 0);
@@ -203,58 +200,15 @@ static void apply_tile_colors(lv_obj_t *tile, lv_obj_t *label, bool dark)
     lv_obj_set_style_text_color(label, dark ? lv_color_white() : lv_color_black(), 0);
 }
 
-// Tile #2 click toggle
-static void on_tile2_clicked(lv_event_t *e)
+// Tile #1 (forecast) click toggle
+static void on_tile1_clicked(lv_event_t *e)
 {
     LV_UNUSED(e);
-    t2_dark = !t2_dark;
-    apply_tile_colors(t2, t2_label, t2_dark);
+    t1_dark = !t1_dark;
+    apply_tile_colors(t1, t1_label, t1_dark);
 }
 
-// Function: Polished 3-second boot screen
-static void show_boot_screen()
-{
-    lv_obj_t *scr = lv_scr_act();
-
-    // Black background
-    lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
-
-    // Label: Name, Group, Firmware
-    lv_obj_t *label = lv_label_create(scr);
-    lv_label_set_text_fmt(label, "Group 8\nFirmware v1.2.0");
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_28, 0);
-    lv_obj_set_style_text_color(label, lv_color_white(), 0);
-    lv_obj_center(label);
-
-    // Horizontal progress line
-    lv_obj_t *bar = lv_bar_create(scr);
-    lv_obj_set_size(bar, 220, 8);
-    lv_obj_align(bar, LV_ALIGN_BOTTOM_MID, 0, -50);
-    lv_bar_set_range(bar, 0, 100);
-    lv_bar_set_value(bar, 0, LV_ANIM_OFF);
-    lv_obj_set_style_bg_color(bar, lv_color_white(), 0);
-
-    // Animate line over exactly 3 seconds
-    const unsigned long duration_ms = 3000;
-    unsigned long startTime = millis();
-
-    while (millis() - startTime < duration_ms)
-    {
-        unsigned long elapsed = millis() - startTime;
-        int lineValue = (elapsed * 100) / duration_ms;
-        if (lineValue > 100)
-            lineValue = 100;
-
-        lv_bar_set_value(bar, lineValue, LV_ANIM_OFF);
-        lv_timer_handler();
-        delay(5);
-    }
-
-    lv_obj_clean(scr); // clear before main UI
-}
-
-// Function: Update Wi-Fi status on Tile #4 (non-blocking, smooth)
+// Function: Update Wi-Fi status on Tile #3 (non-blocking, smooth)
 static void update_wifi_status()
 {
     wl_status_t current_status = WiFi.status();
@@ -266,14 +220,14 @@ static void update_wifi_status()
         snprintf(buf, sizeof(buf), "Wi-Fi: %s\nIP: %d.%d.%d.%d",
                  WiFi.SSID().c_str(),
                  ip[0], ip[1], ip[2], ip[3]);
-        lv_label_set_text(t4_label, buf);
-        lv_obj_center(t4_label); // only center once
+        lv_label_set_text(t3_label, buf);
+        lv_obj_center(t3_label); // only center once
         wifi_was_connected = true;
     }
     else if (current_status != WL_CONNECTED && wifi_was_connected)
     {
-        lv_label_set_text(t4_label, "Wi-Fi: Connecting...");
-        lv_obj_center(t4_label);
+        lv_label_set_text(t3_label, "Wi-Fi: Connecting...");
+        lv_obj_center(t3_label);
         wifi_was_connected = false;
     }
     // If status hasn't changed, do nothing → no redraw → smooth
@@ -286,44 +240,44 @@ static void create_ui()
     lv_obj_set_size(tileview, lv_disp_get_hor_res(NULL), lv_disp_get_ver_res(NULL));
     lv_obj_set_scrollbar_mode(tileview, LV_SCROLLBAR_MODE_OFF);
 
-    // Add three horizontal tiles
-    t1 = lv_tileview_add_tile(tileview, 0, 0, LV_DIR_HOR);
-    t2 = lv_tileview_add_tile(tileview, 1, 0, LV_DIR_HOR);
-    t3 = lv_tileview_add_tile(tileview, 2, 0, LV_DIR_HOR);
-    t4 = lv_tileview_add_tile(tileview, 3, 0, LV_DIR_HOR); // Wi-Fi tile
+    // Add tiles
+    t0 = lv_tileview_add_tile(tileview, 0, 0, LV_DIR_HOR); // Boot screen tile
+    t1 = lv_tileview_add_tile(tileview, 1, 0, LV_DIR_HOR); // 7-day forecast
+    t2 = lv_tileview_add_tile(tileview, 2, 0, LV_DIR_HOR); // Historical data
+    t3 = lv_tileview_add_tile(tileview, 3, 0, LV_DIR_HOR); // Wi-Fi tile
 
-    // Tile #1
-    // IDK, for now just the current temperature.
+    // Tile #0 - Boot Screen (Permanent)
+    lv_obj_set_style_bg_color(t0, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(t0, LV_OPA_COVER, 0);
+    
+    t0_label = lv_label_create(t0);
+    lv_label_set_text(t0_label, "Group 8\nFirmware v1.2.0");
+    lv_obj_set_style_text_font(t0_label, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_color(t0_label, lv_color_white(), 0);
+    lv_obj_center(t0_label);
+
+    // Tile #1 - 7-Day Forecast
     t1_label = lv_label_create(t1);
-    lv_label_set_text(t1_label, "Current temperature: Nope...");
+    lv_label_set_text(t1_label, "Forecast data: Loading...");
     lv_obj_set_style_text_font(t1_label, &lv_font_montserrat_28, 0);
     lv_obj_center(t1_label);
     apply_tile_colors(t1, t1_label, false);
+    lv_obj_add_flag(t1, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(t1, on_tile1_clicked, LV_EVENT_CLICKED, NULL);
 
-    // Tile #2
-    // Forcast weather data
+    // Tile #2 - Historical weather data
     t2_label = lv_label_create(t2);
-    lv_label_set_text(t2_label, "Forcast data: Not yet apparently...");
+    lv_label_set_text(t2_label, "Historical data: Loading...");
     lv_obj_set_style_text_font(t2_label, &lv_font_montserrat_28, 0);
     lv_obj_center(t2_label);
     apply_tile_colors(t2, t2_label, false);
-    lv_obj_add_flag(t2, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(t2, on_tile2_clicked, LV_EVENT_CLICKED, NULL);
 
-    // Tile #3
-    // Historical weather data
+    // Tile #3 - Wi-Fi status
     t3_label = lv_label_create(t3);
-    lv_label_set_text(t3_label, "Historical data: Not yet huh...");
+    lv_label_set_text(t3_label, "Wi-Fi: Connecting...");
     lv_obj_set_style_text_font(t3_label, &lv_font_montserrat_28, 0);
     lv_obj_center(t3_label);
     apply_tile_colors(t3, t3_label, false);
-
-    // Tile #4 (Wi-Fi status)
-    t4_label = lv_label_create(t4);
-    lv_label_set_text(t4_label, "Wi-Fi: Connecting...");
-    lv_obj_set_style_text_font(t4_label, &lv_font_montserrat_28, 0);
-    lv_obj_center(t4_label);
-    apply_tile_colors(t4, t4_label, false);
 }
 
 /**
@@ -333,13 +287,7 @@ void update_ui()
 {
     char buffer[1024]; // A buffer for building the label strings
 
-    // --- Update Tile 1: Current Weather ---
-    snprintf(buffer, sizeof(buffer), "Current Temp:\n%.1f C",
-             currentHourlyTemp);
-    lv_label_set_text(t1_label, buffer);
-    lv_obj_center(t1_label); // Re-center after text change
-
-    // --- Update Tile 2: 7-Day Forecast ---
+    // --- Update Tile 1: 7-Day Forecast ---
     snprintf(buffer, sizeof(buffer),
              "7-Day Forecast (at 12:00):\n"
              "%s: %.2f C, %s\n"
@@ -370,10 +318,10 @@ void update_ui()
              sevenDayForecast.hours[6].time,
              sevenDayForecast.hours[6].temperature,
              getWeatherString(sevenDayForecast.hours[6].weatherCondition));
-    lv_label_set_text(t2_label, buffer);
-    lv_obj_center(t2_label); // Re-center
+    lv_label_set_text(t1_label, buffer);
+    lv_obj_center(t1_label); // Re-center
 
-    // --- Update Tile 3: Historical Weather ---
+    // --- Update Tile 2: Historical Weather ---
     // Show the total days fetched and the most recent (yesterday)
     if (lastMonthsAverageTemps.used_length > 0)
     {
@@ -391,8 +339,8 @@ void update_ui()
     {
         snprintf(buffer, sizeof(buffer), "Historical Data:\nNo data loaded.");
     }
-    lv_label_set_text(t3_label, buffer);
-    lv_obj_center(t3_label); // Re-center
+    lv_label_set_text(t2_label, buffer);
+    lv_obj_center(t2_label); // Re-center
 }
 
 /**
@@ -475,10 +423,7 @@ void setup()
 
     beginLvglHelper(amoled);
 
-    // Show boot screen for 3 seconds
-    show_boot_screen();
-
-    // Create main UI
+    // Create main UI (boot screen is now permanent as tile 0)
     create_ui();
 
     // Connect Wi-Fi once (non-blocking)
@@ -502,15 +447,6 @@ void loop()
     }
     if (wifi_was_connected && (millis() - last_weather_update > WEATHER_UPDATE_INTERVAL || last_weather_update == 0))
     {
-
-        // Update the
-        String hourlyUrl = "https://opendata-download-metobs.smhi.se/api/version/1.0/parameter/1/station/65090/period/latest-hour/data.json";
-        StaticJsonDocument<2048> hourlyDoc; // Small, on the stack
-        if (fetchJsonFromServer(hourlyUrl, hourlyDoc))
-        {
-            currentHourlyTemp = hourlyDoc["value"][0]["value"].as<float>();
-        }
-
         // Update the seven day forcast global object.
         String sevenDayForcastUrl = "https://opendata-download-metfcst.smhi.se/api/category/snow1g/version/1/geotype/point/lon/15.589/lat/56.15/data.json";
         DynamicJsonDocument forecastDoc(40000); // 32k, on the heap
@@ -518,7 +454,6 @@ void loop()
         {
 
             JsonArray hours = forecastDoc["timeSeries"].as<JsonArray>();
-            int skips = 12;
             int skip = 0;
             int next_day = 0;
             for (JsonVariant hour : hours)
