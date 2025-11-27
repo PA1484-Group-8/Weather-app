@@ -85,71 +85,120 @@ struct WeatherCondition
 };
 
 /**
- * @brief Converts a WeatherCondition enum into a human-readable string.
+ * @brief Converts a WeatherCondition enum into a weather symbol.
+ * Uses Unicode weather symbols that display nicely.
  */
-const char *
-getWeatherString(WeatherCondition symbol)
+const char *getWeatherSymbol(WeatherCondition symbol)
 {
     switch (symbol.value)
     {
     case WeatherCondition::ClearSky:
-        return "ClearSky";
     case WeatherCondition::NearlyClearSky:
-        return "NearlyClearSky";
+        return "☀"; // Sun
     case WeatherCondition::VariableCloudiness:
-        return "VariableCloudiness";
     case WeatherCondition::HalfClearSky:
-        return "HalfClearSky";
+        return "⛅"; // Sun behind cloud
     case WeatherCondition::CloudySky:
-        return "CloudySky";
+    case WeatherCondition::Overcast:
+        return "☁"; // Cloud
+    case WeatherCondition::Fog:
+        return "🌫"; // Fog
+    case WeatherCondition::LightRainShowers:
+    case WeatherCondition::ModerateRainShowers:
+    case WeatherCondition::LightRain:
+    case WeatherCondition::ModerateRain:
+        return "🌧"; // Cloud with rain
+    case WeatherCondition::HeavyRainShowers:
+    case WeatherCondition::HeavyRain:
+        return "⛈"; // Cloud with rain and lightning
+    case WeatherCondition::Thunderstorm:
+    case WeatherCondition::Thunder:
+        return "⚡"; // Lightning
+    case WeatherCondition::LightSleetShowers:
+    case WeatherCondition::ModerateSleetShowers:
+    case WeatherCondition::HeavySleetShowers:
+    case WeatherCondition::LightSleet:
+    case WeatherCondition::ModerateSleet:
+    case WeatherCondition::HeavySleet:
+        return "🌨"; // Cloud with snow
+    case WeatherCondition::LightSnowShowers:
+    case WeatherCondition::ModerateSnowShowers:
+    case WeatherCondition::HeavySnowShowers:
+    case WeatherCondition::LightSnowfall:
+    case WeatherCondition::ModerateSnowfall:
+    case WeatherCondition::HeavySnowfall:
+        return "❄"; // Snowflake
+    default:
+        return "?"; // Unknown
+    }
+}
+
+/**
+ * @brief Converts a WeatherCondition enum into a human-readable string.
+ */
+const char *getWeatherString(WeatherCondition symbol)
+{
+    switch (symbol.value)
+    {
+    case WeatherCondition::ClearSky:
+        return "Clear";
+    case WeatherCondition::NearlyClearSky:
+        return "Mostly Clear";
+    case WeatherCondition::VariableCloudiness:
+        return "Partly Cloudy";
+    case WeatherCondition::HalfClearSky:
+        return "Partly Cloudy";
+    case WeatherCondition::CloudySky:
+        return "Cloudy";
     case WeatherCondition::Overcast:
         return "Overcast";
     case WeatherCondition::Fog:
         return "Fog";
     case WeatherCondition::LightRainShowers:
-        return "LightRainShowers";
+        return "Light Rain";
     case WeatherCondition::ModerateRainShowers:
-        return "ModerateRainShowers";
+        return "Rain";
     case WeatherCondition::HeavyRainShowers:
-        return "HeavyRainShowers";
+        return "Heavy Rain";
     case WeatherCondition::Thunderstorm:
         return "Thunderstorm";
     case WeatherCondition::LightSleetShowers:
-        return "LightSleetShowers";
+        return "Light Sleet";
     case WeatherCondition::ModerateSleetShowers:
-        return "ModerateSleetShowers";
+        return "Sleet";
     case WeatherCondition::HeavySleetShowers:
-        return "HeavySleetShowers";
+        return "Heavy Sleet";
     case WeatherCondition::LightSnowShowers:
-        return "LightSnowShowers";
+        return "Light Snow";
     case WeatherCondition::ModerateSnowShowers:
-        return "ModerateSnowShowers";
+        return "Snow";
     case WeatherCondition::HeavySnowShowers:
-        return "HeavySnowShowers";
+        return "Heavy Snow";
     case WeatherCondition::LightRain:
-        return "LightRain";
+        return "Light Rain";
     case WeatherCondition::ModerateRain:
-        return "ModerateRain";
+        return "Rain";
     case WeatherCondition::HeavyRain:
-        return "HeavyRain";
+        return "Heavy Rain";
     case WeatherCondition::Thunder:
         return "Thunder";
     case WeatherCondition::LightSleet:
-        return "LightSleet";
+        return "Light Sleet";
     case WeatherCondition::ModerateSleet:
-        return "ModerateSleet";
+        return "Sleet";
     case WeatherCondition::HeavySleet:
-        return "HeavySleet";
+        return "Heavy Sleet";
     case WeatherCondition::LightSnowfall:
-        return "LightSnowfall";
+        return "Light Snow";
     case WeatherCondition::ModerateSnowfall:
-        return "ModerateSnowfall";
+        return "Snow";
     case WeatherCondition::HeavySnowfall:
-        return "HeavySnowfall";
+        return "Heavy Snow";
     default:
         return "Unknown";
     }
 }
+
 // the number of chars in the forcast time stamp
 const int FORCAST_TIMESTAMP_SIZE = 20;
 /**
@@ -259,7 +308,7 @@ static void create_ui()
     // Tile #1 - 7-Day Forecast
     t1_label = lv_label_create(t1);
     lv_label_set_text(t1_label, "Forecast data: Loading...");
-    lv_obj_set_style_text_font(t1_label, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(t1_label, &lv_font_montserrat_20, 0);
     lv_obj_center(t1_label);
     apply_tile_colors(t1, t1_label, false);
     lv_obj_add_flag(t1, LV_OBJ_FLAG_CLICKABLE);
@@ -281,43 +330,54 @@ static void create_ui()
 }
 
 /**
+ * @brief Extracts day and month from ISO timestamp
+ * Example: "2025-11-27T12:00:00Z" -> "Nov 27"
+ */
+void formatDate(const char* timestamp, char* output, size_t outputSize)
+{
+    if (strlen(timestamp) < 10) {
+        snprintf(output, outputSize, "???");
+        return;
+    }
+    
+    int year, month, day;
+    sscanf(timestamp, "%d-%d-%d", &year, &month, &day);
+    
+    const char* monthNames[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+    
+    if (month >= 1 && month <= 12) {
+        snprintf(output, outputSize, "%s %d", monthNames[month - 1], day);
+    } else {
+        snprintf(output, outputSize, "???");
+    }
+}
+
+/**
  * @brief Updates all UI labels with data from global variables.
  */
 void update_ui()
 {
-    char buffer[1024]; // A buffer for building the label strings
+    char buffer[2048]; // Larger buffer for symbols and formatting
+    char dateStr[16];
 
-    // --- Update Tile 1: 7-Day Forecast ---
-    snprintf(buffer, sizeof(buffer),
-             "7-Day Forecast (at 12:00):\n"
-             "%s: %.2f C, %s\n"
-             "%s: %.2f C, %s\n"
-             "%s: %.2f C, %s\n"
-             "%s: %.2f C, %s\n"
-             "%s: %.2f C, %s\n"
-             "%s: %.2f C, %s\n"
-             "%s: %.2f C, %s\n",
-             sevenDayForecast.hours[0].time,
-             sevenDayForecast.hours[0].temperature,
-             getWeatherString(sevenDayForecast.hours[0].weatherCondition),
-             sevenDayForecast.hours[1].time,
-             sevenDayForecast.hours[1].temperature,
-             getWeatherString(sevenDayForecast.hours[1].weatherCondition),
-             sevenDayForecast.hours[2].time,
-             sevenDayForecast.hours[2].temperature,
-             getWeatherString(sevenDayForecast.hours[2].weatherCondition),
-             sevenDayForecast.hours[3].time,
-             sevenDayForecast.hours[3].temperature,
-             getWeatherString(sevenDayForecast.hours[3].weatherCondition),
-             sevenDayForecast.hours[4].time,
-             sevenDayForecast.hours[4].temperature,
-             getWeatherString(sevenDayForecast.hours[4].weatherCondition),
-             sevenDayForecast.hours[5].time,
-             sevenDayForecast.hours[5].temperature,
-             getWeatherString(sevenDayForecast.hours[5].weatherCondition),
-             sevenDayForecast.hours[6].time,
-             sevenDayForecast.hours[6].temperature,
-             getWeatherString(sevenDayForecast.hours[6].weatherCondition));
+    // --- Update Tile 1: 7-Day Forecast with Symbols ---
+    snprintf(buffer, sizeof(buffer), "7-Day Forecast (12:00)\n\n");
+    
+    for (int i = 0; i < 7; i++)
+    {
+        formatDate(sevenDayForecast.hours[i].time, dateStr, sizeof(dateStr));
+        
+        char line[128];
+        snprintf(line, sizeof(line), "%s %s %.1f°C %s\n",
+                 getWeatherSymbol(sevenDayForecast.hours[i].weatherCondition),
+                 dateStr,
+                 sevenDayForecast.hours[i].temperature,
+                 getWeatherString(sevenDayForecast.hours[i].weatherCondition));
+        
+        strcat(buffer, line);
+    }
+    
     lv_label_set_text(t1_label, buffer);
     lv_obj_center(t1_label); // Re-center
 
