@@ -10,8 +10,8 @@
 #include <Preferences.h>
 
 // Wi-Fi credentials
-static const char *WIFI_SSID = "iPhone (2)";
-static const char *WIFI_PASSWORD = "6z3sveylgk3a";
+static const char *WIFI_SSID = "AN";
+static const char *WIFI_PASSWORD = "3feC=Mic@iKsi&Da";
 
 LilyGo_Class amoled;
 
@@ -468,6 +468,10 @@ static void create_ui()
     lv_obj_set_style_text_font(t4_label, &lv_font_montserrat_28, 0);
     lv_obj_center(t4_label);
     apply_tile_colors(t4, t4_label, false);
+
+    // Explicitly set the screen to Tile 0 (Boot screen)
+    // This is necessary to ensure that the boot screen is shown first and not some other tile.
+    lv_obj_set_tile(tileview, t0, LV_ANIM_OFF);
 }
 
 /**
@@ -542,6 +546,7 @@ void update_ui()
     }
     lv_label_set_text(t2_label, buffer);
     lv_obj_center(t2_label); // Re-center
+
 }
 
 /**
