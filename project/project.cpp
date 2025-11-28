@@ -9,6 +9,13 @@
 #include <lvgl.h>
 #include <Preferences.h>
 
+// Custom font based on montserrat with the extra characters ÅÄÖ☀⛅☁🌫🌧⛈⚡🌨❄ 
+// Combined with the noto emoji font found at https://fonts.google.com/noto/specimen/Noto+Emoji?preview.text=%E2%98%80%E2%9B%85%E2%98%81%F0%9F%8C%AB%F0%9F%8C%A7%E2%9B%88%E2%9A%A1%F0%9F%8C%A8%E2%9D%84
+// Generated with the online tool at https://lvgl.io/tools/fontconverter
+// montserrat_se_16,  this is also set to default in src/lv_conf.h
+// montserrat_se_20
+// montserrat_se_28
+
 // Wi-Fi credentials
 static const char *WIFI_SSID = "AN";
 static const char *WIFI_PASSWORD = "3feC=Mic@iKsi&Da";
@@ -25,11 +32,9 @@ static lv_obj_t *t4; // wifi
 static lv_obj_t *t0_label; // Boot screen label
 static lv_obj_t *t1_label;
 static lv_obj_t *t2_label;
-static lv_obj_t *t3_label; // settings
+
+
 static lv_obj_t *t4_label; // wifi
-
-
-static bool t1_dark = false; // start tile #1 (forecast) in light mode
 
 // track Wi-Fi connection, whenever you need to access the internet you need to check that this is true.
 static bool wifi_was_connected = false;
@@ -256,55 +261,11 @@ struct City {
 };
 
 static City cities[]= {
-    {"Stockholm",        59.3293, 18.0686, 98210},
-    {"Göteborg",         57.7089, 11.9746, 71420},
-    {"Malmö",            55.6050, 13.0038, 53400},
-    {"Uppsala",          59.8586, 17.6389, 97530},
-    {"Västerås",         59.6099, 16.5448, 94800},
-    {"Örebro",           59.2741, 15.2066, 94820},
-    {"Linköping",        58.4108, 15.6214, 97500},
-    {"Helsingborg",      56.0465, 12.6945, 62480},
-    {"Jönköping",        57.7815, 14.1562, 77160},
-    {"Norrköping",       58.5877, 16.1924, 97510},
-    {"Lund",             55.7047, 13.1910, 53400},
-    {"Umeå",             63.8258, 20.2630, 140480},
-    {"Gävle",            60.6749, 17.1413, 107290},
-    {"Borås",            57.7210, 12.9398, 71470},
-    {"Eskilstuna",       59.3666, 16.5077, 96330},
-    {"Södertälje",       59.1955, 17.6253, 97590},
-    {"Karlstad",         59.4022, 13.5115, 94870},
-    {"Täby",             59.4439, 18.0687, 98210},
-    {"Växjö",            56.8790, 14.8059, 65090},
-    {"Halmstad",         56.6743, 12.8570, 62430},
-    {"Sundsvall",        62.3908, 17.3069, 128870},
-    {"Luleå",            65.5848, 22.1567, 159880},
-    {"Trollhättan",      58.2860, 12.2913, 72310},
-    {"Östersund",        63.1792, 14.6357, 144740},
-    {"Borlänge",         60.4858, 15.4371, 106290},
-    {"Upplands Väsby",   59.5184, 17.9110, 98210},
-    {"Tumba",            59.1981, 17.8337, 97590},
-    {"Kristianstad",     56.0313, 14.1524, 61910},
-    {"Kalmar",           56.6634, 16.3568, 85250},
-    {"Skövde",           58.3903, 13.8460, 81530},
+    {"Stockholm",        59.3293, 18.0686, 97400},
+    {"Göteborg",         57.7089, 11.9746, 72420},
+    {"Malmö",            55.6050, 13.0038, 53300},
     {"Karlskrona",       56.1612, 15.5869, 65090},
-    {"Skellefteå",       64.7500, 20.9500, 159410},
-    {"Uddevalla",        58.3500, 11.9333, 72350},
-    {"Falun",            60.6074, 15.6310, 106210},
-    {"Trelleborg",       55.3751, 13.1569, 53400},
-    {"Nyköping",         58.7557, 17.0079, 97100},
-    {"Karlskoga",        59.3266, 14.5230, 94840},
-    {"Varberg",          57.1057, 12.2508, 62410},
-    {"Örnsköldsvik",     63.2909, 18.7153, 128370},
-    {"Vänersborg",       58.3807, 12.3235, 72310},
-    {"Motala",           58.5371, 15.0365, 97540},
-    {"Lidingö",          59.3668, 18.1334, 98210},
-    {"Piteå",            65.3167, 21.4783, 159890},
-    {"Mölndal",          57.6554, 12.0138, 71420},
-    {"Alingsås",         57.9303, 12.5336, 71470},
-    {"Sandviken",        60.6200, 16.7750, 107290},
-    {"Boo (Nacka)",      59.3660, 18.2650, 98210},
-    {"Åkersberga",       59.4794, 18.2997, 98210},
-    {"Visby",            57.6348, 18.2948, 94300},
+    {"Kiruna",           67.8558, 20.2253,180940}
 };
 static const int CITY_COUNT = sizeof(cities)/sizeof(cities[0]);
 
@@ -333,19 +294,10 @@ static lv_obj_t *settings_status_label;
 
 
 // Function: Tile Color change
-static void apply_tile_colors(lv_obj_t *tile, lv_obj_t *label, bool dark)
+static void apply_tile_colors(lv_obj_t *tile)
 {
     lv_obj_set_style_bg_opa(tile, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(tile, dark ? lv_color_black() : lv_color_white(), 0);
-    lv_obj_set_style_text_color(label, dark ? lv_color_white() : lv_color_black(), 0);
-}
-
-// Tile #1 (forecast) click toggle
-static void on_tile1_clicked(lv_event_t *e)
-{
-    LV_UNUSED(e);
-    t1_dark = !t1_dark;
-    apply_tile_colors(t1, t1_label, t1_dark);
+    lv_obj_set_style_bg_color(tile,lv_color_white(), 0);
 }
 
 // Function: Update Wi-Fi status on Tile #3 (non-blocking, smooth)
@@ -393,31 +345,30 @@ static void create_ui()
     
     t0_label = lv_label_create(t0);
     lv_label_set_text(t0_label, "Group 8\nFirmware v1.2.0");
-    lv_obj_set_style_text_font(t0_label, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(t0_label, &montserrat_se_28, 0);
     lv_obj_set_style_text_color(t0_label, lv_color_white(), 0);
     lv_obj_center(t0_label);
 
     // Tile #1 - 7-Day Forecast
     t1_label = lv_label_create(t1);
     lv_label_set_text(t1_label, "Forecast data: Loading...");
-    lv_obj_set_style_text_font(t1_label, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_font(t1_label, &montserrat_se_20, 0);
     lv_obj_center(t1_label);
-    apply_tile_colors(t1, t1_label, false);
-    lv_obj_add_flag(t1, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(t1, on_tile1_clicked, LV_EVENT_CLICKED, NULL);
+    apply_tile_colors(t1);
 
     // Tile #2 - Historical weather data
     t2_label = lv_label_create(t2);
     lv_label_set_text(t2_label, "Historical data: Loading...");
-    lv_obj_set_style_text_font(t2_label, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(t2_label, &montserrat_se_28, 0);
     lv_obj_center(t2_label);
-    apply_tile_colors(t2, t2_label, false);
+    apply_tile_colors(t2);
 
     // Tile #3 - drop-down settings
-    t3_label = lv_label_create(t3);
+    lv_obj_t *t3_label = lv_label_create(t3);
     lv_label_set_text(t3_label, "Settings");
-    lv_obj_set_style_text_font(t3_label, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(t3_label, &montserrat_se_28, 0);
     lv_obj_align(t3_label, LV_ALIGN_TOP_MID, 0, 6);
+    apply_tile_colors(t3);
 
     // City dropdown, build options string
     String cityOptions;
@@ -431,6 +382,14 @@ static void create_ui()
     lv_dropdown_set_options(city_dropdown, cityOptions.c_str());
     lv_obj_set_width(city_dropdown, 200);
     lv_obj_align(city_dropdown, LV_ALIGN_TOP_LEFT, 10, 50);
+
+    // Set font for the "header" (the button you see when closed)
+    lv_obj_set_style_text_font(city_dropdown, &montserrat_se_28, 0); 
+    
+    // Set font for the "list" (the popup menu)
+    lv_obj_t * list = lv_dropdown_get_list(city_dropdown);
+    lv_obj_set_style_text_font(list, &montserrat_se_28, LV_PART_MAIN);
+        
     lv_dropdown_set_selected(city_dropdown, selectedCityIndex);
 
     // Parameter dropdown
@@ -465,9 +424,9 @@ static void create_ui()
     // Tile #4 - Wi-Fi status
     t4_label = lv_label_create(t4);
     lv_label_set_text(t4_label, "Wi-Fi: Connecting...");
-    lv_obj_set_style_text_font(t4_label, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(t4_label, &montserrat_se_28, 0);
     lv_obj_center(t4_label);
-    apply_tile_colors(t4, t4_label, false);
+    apply_tile_colors(t4);
 
     // Explicitly set the screen to Tile 0 (Boot screen)
     // This is necessary to ensure that the boot screen is shown first and not some other tile.
