@@ -33,8 +33,6 @@ static lv_obj_t *t4_label; // wifi
 static bool wifi_was_connected = false;
 static unsigned long last_wifi_update = 0; // track last Wi-Fi update time
 
-static bool weather_fetched = false;
-
 Preferences preferences; // for settings
 
 /**
@@ -229,10 +227,11 @@ struct Parameter
   const char *apiCode;
 };
 
-// 2. A container for one specific historical parameter (e.g., Wind Speed over 150 days)
+// 2. A container for one specific historical parameter (e.g., Wind Speed) It can hold up to MAX_HOURS entries of data.
 struct HistoricalSeries
 {
-  float values[150];
+  static constexpr int MAX_HOURS = 4000; // I want to set this to 4000 to store the full API data but then it runs out of memory and won't compile.
+  float *values = nullptr;
   int count = 0;
   bool isLoaded = false; // Helpful to check if we actually have data
 };
@@ -249,12 +248,21 @@ struct City
 
   // Dynamic Data Storage
   ForcastHourlyWeather forecast[7]; // 7 days of forecast
-  HistoricalSeries history[4];      // 4 slots: [0]Temp, [1]Hum, [2]Wind, [3]Press
+
+  HistoricalSeries history[4]; // 4 slots: [0]Temp, [1]Hum, [2]Wind, [3]Press
+
+  bool loaded_forcast;
+  bool loaded_historical[4];
 };
 
 static City cities[] = {
 
-    {"Karlskrona", "56.16156", "15.58661", "65090"},
+    {
+        "Karlskrona",
+        "56.16156",
+        "15.58661",
+        "65090",
+    },
     {"Stockholm", "59.33258", "18.0649", "97400"},
     {"Göteborg", "57.708870", "11.974560", "72420"},
     {"Malmö", "55.60587", "13.00073", "53300"},
@@ -386,8 +394,8 @@ void update_ui()
     int mostRecentIndex = cities[selectedCityIndex].history[selectedParamIndex].count - 1;
     snprintf(buffer, sizeof(buffer),
              "Historical Data:\n"
-             "Fetched %d days.\n"
-             "City: %s"
+             "Fetched %d Hours.\n"
+             "City: %s\n"
              "%s: (%.1f):\n",
              cities[selectedCityIndex].history[selectedParamIndex].count,
              cities[selectedCityIndex].name,
@@ -398,6 +406,8 @@ void update_ui()
   {
     snprintf(buffer, sizeof(buffer), "Historical Data:\nNo data loaded.");
   }
+
+  lv_label_set_text(settings_status_label, "");
   lv_label_set_text(t2_label, buffer);
   lv_obj_center(t2_label); // Re-center
 }
@@ -411,15 +421,54 @@ void settings_value_changed(lv_event_t *e)
   {
     selectedCityIndex = lv_dropdown_get_selected(obj);
     lv_label_set_text(settings_status_label,
-                      "City selected - will apply on next refresh");
+                      "City selected - updating UI...");
   }
   else if (obj == param_dropdown)
   {
     selectedParamIndex = lv_dropdown_get_selected(obj);
     lv_label_set_text(settings_status_label,
-                      "Parameters selected - will apply on next refresh");
+                      "Parameters selected - updating UI...");
   }
-  update_ui();
+  // UI gets updated automatically in the loop so we don't need to do it here.
+}
+
+static void on_save_defaults(lv_event_t *e)
+{
+  LV_UNUSED(e); // reset to built-in defaults (index 0)
+  preferences.begin("weather", false);
+  preferences.putUInt("city_idx", (uint32_t)selectedCityIndex);
+  preferences.putUInt("param_idx", (uint32_t)selectedParamIndex);
+  preferences.end();
+  lv_label_set_text(settings_status_label, "Defaults saved!");
+  Serial.println("Defaults saved to Preferences.");
+}
+
+static void on_reset_deaults(lv_event_t *e)
+{
+  LV_UNUSED(e); // reset to built-in defaults (index 0)
+  selectedCityIndex = 0;
+  selectedParamIndex = 0;
+  lv_dropdown_set_selected(city_dropdown, selectedCityIndex);
+  lv_dropdown_set_selected(param_dropdown, selectedParamIndex);
+
+  preferences.begin("weather", false);
+  preferences.clear();
+  preferences.end();
+
+  lv_label_set_text(settings_status_label,
+                    "Defaults reset to built-in defaults.");
+  Serial.println("Preferences cleared and UI reset.");
+}
+
+static void get_saved_preferences()
+{
+  preferences.begin("weather", true);
+  selectedCityIndex = preferences.getUInt("city_idx", 0);
+  selectedParamIndex = preferences.getUInt("param_idx", 0);
+  preferences.end();
+
+  Serial.printf("Loaded Preferences: city_idx=%d, param_idx=%d\n",
+                selectedCityIndex, selectedParamIndex);
 }
 
 // Function: Creates UI
@@ -524,9 +573,17 @@ static void create_ui()
   lv_obj_set_width(btn_save_default, 160);
   lv_obj_t *lbl_save = lv_label_create(btn_save_default);
   lv_label_set_text(lbl_save, "Save As Default");
+  lv_obj_add_event_cb(btn_save_default, on_save_defaults, LV_EVENT_CLICKED, NULL);
+
 
   // Reset Defaults button
   btn_reset_defaults = lv_btn_create(t3);
+  lv_obj_align(btn_save_default, LV_ALIGN_BOTTOM_RIGHT, -10, -50);
+  lv_obj_set_width(btn_reset_defaults, 160);
+  lv_obj_t *lbl_reset = lv_label_create(btn_reset_defaults);
+  lv_label_set_text(lbl_reset, "Reset Defaults");
+  lv_obj_add_event_cb(btn_reset_defaults, on_reset_deaults, LV_EVENT_CLICKED, NULL);
+
 
   // Status label
   settings_status_label = lv_label_create(t3);
@@ -609,8 +666,8 @@ static bool fetchJsonFromServer(const String &url, JsonDocument &doc)
   }
 }
 
-// This allows making use of the 8MB of extra ps ram. 
-// It happened in the `fetchAllWeatherData` function that when allocating 100 kilobyte to handle json it ran out of normal ram.
+// This allows making use of the 8MB of extra ps ram.
+// (It happened in the previous `fetchAllWeatherData` function that when allocating 100 kilobyte to handle json it ran out of normal ram.)
 struct SpiRamAllocator
 {
   void *allocate(size_t size)
@@ -631,130 +688,125 @@ SpiRamAllocator myPsramAllocator;
 // Define a custom type that uses this allocator
 using SpiRamJsonDocument = BasicJsonDocument<SpiRamAllocator>;
 
-void fetchAllWeatherData()
+/**
+ *@brief Fetches the forcast data for the city with index c in the cities array.
+ *@returns true if successful, false otherwise.
+ */
+bool fetchForcast(int c)
 {
   if (WiFi.status() != WL_CONNECTED)
   {
     Serial.println("Aborting fetching API because no internet connection");
 
-    return;
+    return false;
   }
+  // 200KB
+  SpiRamJsonDocument doc(200000);
 
-  // 1MB!!!
-  SpiRamJsonDocument doc(1000000);
-  // Loop through all 5 cities
-  for (int c = 0; c < CITY_COUNT; c++)
+  // 1. Fetch Forecast for City[c]
+  String forecastUrl = "https://opendata-download-metfcst.smhi.se/api/category/snow1g/version/1/geotype/point/lon/";
+  forecastUrl += cities[c].lon;
+  forecastUrl += "/lat/";
+  forecastUrl += cities[c].lat;
+  forecastUrl += "/data.json";
+
+  Serial.printf("Fetching Forecast for %s...\n", cities[c].name);
+
+  if (fetchJsonFromServer(forecastUrl, doc))
   {
 
-    // 1. Fetch Forecast for City[c]
-    String forecastUrl = "https://opendata-download-metfcst.smhi.se/api/category/snow1g/version/1/geotype/point/lon/";
-    forecastUrl += cities[c].lon;
-    forecastUrl += "/lat/";
-    forecastUrl += cities[c].lat;
-    forecastUrl += "/data.json";
-
-    Serial.printf("Fetching Forecast for %s...\n", cities[c].name);
-
-    if (fetchJsonFromServer(forecastUrl, doc))
+    JsonArray hours = doc["timeSeries"].as<JsonArray>();
+    int skip = 0;
+    int next_day = 0;
+    for (JsonVariant hour : hours)
     {
-      JsonArray hours = doc["timeSeries"].as<JsonArray>();
-      int skip = 0;
-      int next_day = 0;
-      for (JsonVariant hour : hours)
+      // Guarantees that we skip todays 12:00pm and take the next 7.
+      if (skip < 12)
       {
-        // Guarantees that we skip todays 12:00pm and take the next 7.
-        if (skip < 12)
+        skip++;
+        continue;
+      }
+      const char *time = hour["time"].as<const char *>();
+      if (time != nullptr)
+      {
+        if (is_it_twelve(time) && next_day < 7)
         {
-          skip++;
-          continue;
-        }
-        const char *time = hour["time"].as<const char *>();
-        if (time != nullptr)
-        {
-          if (is_it_twelve(time) && next_day < 7)
-          {
-            ForcastHourlyWeather &hourly = cities[c].forecast[next_day];
-            hourly.temperature = hour["data"]["air_temperature"].as<float>();
-            hourly.weatherCondition =
-                WeatherCondition(hour["data"]["symbol_code"].as<int>());
-            strncpy(hourly.time, time, 20);
-            hourly.time[20] = '\0';
-            next_day++;
-          }
+          ForcastHourlyWeather &hourly = cities[c].forecast[next_day];
+          hourly.temperature = hour["data"]["air_temperature"].as<float>();
+          hourly.weatherCondition =
+              WeatherCondition(hour["data"]["symbol_code"].as<int>());
+          strncpy(hourly.time, time, 20);
+          hourly.time[20] = '\0';
+          next_day++;
         }
       }
+      cities[c].loaded_forcast = true;
+      
     }
-
-    // Keep the UI alive while loading!
-    lv_timer_handler();
-
-    // 2. Fetch Historical Data for City[c] (All 4 params)
-    for (int p = 0; p < PARAM_COUNT; p++)
-    {
-
-      String histUrl = "https://opendata-download-metobs.smhi.se/api/version/1.0/parameter/";
-      histUrl += parameters[p].apiCode;
-      histUrl += "/station/";
-      histUrl += cities[c].stationID;
-      histUrl += "/period/latest-months/data.json";
-
-      Serial.printf("Fetching History (%s) for %s...\n", parameters[p].label, cities[c].name);
-
-      if (fetchJsonFromServer(histUrl, doc))
-      {
-        JsonArray days = doc["value"].as<JsonArray>();
-        int idx = 0;
-        // Access the specific history slot: cities[c].history[p]
-        for (JsonVariant day : days)
-        {
-          if (idx >= 150)
-            break;
-          cities[c].history[p].values[idx] = day["value"].as<float>();
-          idx++;
-        }
-        cities[c].history[p].count = idx;
-        cities[c].history[p].isLoaded = true;
-      }
-
-      lv_timer_handler();
-      delay(200);
-    }
+    return true;
   }
-  weather_fetched = true;
-  Serial.println("All data fetched!");
+  return false;
 }
 
-static void on_save_defaults(lv_event_t *e)
+/**
+ *@brief Fetches the historical data for the city with index c and weather parameter with index p.
+ *@returns true if successful, false otherwise.
+ */
+bool fetchHistorical(int c, int p)
 {
-  LV_UNUSED(e); // reset to built-in defaults (index 0)
-  preferences.begin("weather", false);
-  preferences.putUInt("city_idx", (uint32_t)selectedCityIndex);
-  preferences.putUInt("param_idx", (uint32_t)selectedParamIndex);
-  preferences.end();
-  lv_label_set_text(settings_status_label, "Defaults saved!");
-  Serial.println("Defaults saved to Preferences.");
-}
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    Serial.println("Aborting fetching API because no internet connection");
 
-static void on_reset_deaults(lv_event_t *e)
-{
-  LV_UNUSED(e); // reset to built-in defaults (index 0)
-  selectedCityIndex = 0;
-  selectedParamIndex = 0;
-  lv_dropdown_set_selected(city_dropdown, selectedCityIndex);
-  lv_dropdown_set_selected(param_dropdown, selectedParamIndex);
+    return false;
+  }
 
-  preferences.begin("weather", false);
-  preferences.clear();
-  preferences.end();
+  // 200KB
+  SpiRamJsonDocument doc(200000);
+  String histUrl = "https://opendata-download-metobs.smhi.se/api/version/1.0/parameter/";
+  histUrl += parameters[p].apiCode;
+  histUrl += "/station/";
+  histUrl += cities[c].stationID;
+  histUrl += "/period/latest-months/data.json";
 
-  lv_label_set_text(settings_status_label,
-                    "Defaults reset to built-in defaults.");
-  Serial.println("Preferences cleared and UI reset.");
+  Serial.printf("Fetching History (%s) for %s...\n", parameters[p].label, cities[c].name);
+
+  if (fetchJsonFromServer(histUrl, doc))
+  {
+    JsonArray days = doc["value"].as<JsonArray>();
+    int idx = 0;
+    // Access the specific history slot: cities[c].history[p]
+    for (JsonVariant day : days)
+    {
+      if (idx >= HistoricalSeries::MAX_HOURS)
+        break;
+      cities[c].history[p].values[idx] = day["value"].as<float>();
+      idx++;
+    }
+    cities[c].history[p].count = idx;
+    cities[c].history[p].isLoaded = true;
+    cities[c].loaded_historical[p] = true;
+    return true;
+  }
+  return false;
 }
 
 // Must-have setup function
 void setup()
 {
+
+  // Before anything we need to initialize the `cities` object fully.
+  for (int i = 0; i < CITY_COUNT; ++i) {
+    for (int j = 0; j < PARAM_COUNT; ++j) {
+      // Allocate the memory on the Heap at runtime
+      cities[i].history[j].values = (float *)ps_malloc(HistoricalSeries::MAX_HOURS * sizeof(float));
+      // Always check for successful allocation
+      if (cities[i].history[j].values == nullptr) {
+        Serial.println("FATAL: Failed to allocate historical data memory!");
+        while (true); // Halt execution
+      }
+    }
+  }
   Serial.begin(115200);
   delay(200);
 
@@ -767,6 +819,9 @@ void setup()
 
   beginLvglHelper(amoled);
 
+  // Load saved default preferences otherwise default to city index 0, Karlskrona and param index 0, air temp.
+  get_saved_preferences();
+
   // Create main UI (boot screen is now permanent as tile 0)
   create_ui();
 
@@ -777,9 +832,6 @@ void setup()
   Serial.printf("Connecting to WiFi SSID: %s\n", WIFI_SSID);
 
   update_wifi_status();
-  fetchAllWeatherData();
-
-  update_ui();
 }
 
 // Loop continuously
@@ -793,10 +845,18 @@ void loop()
     update_wifi_status();
     last_wifi_update = millis();
   }
-  if (weather_fetched != true)
+
+  // In every loop we check if we need to fetch data for what is currently is trying to be displayed.
+  if (cities[selectedCityIndex].loaded_forcast != true)
   {
-    fetchAllWeatherData();
-    if (weather_fetched == true)
+    if (fetchForcast(selectedCityIndex))
+    {
+      update_ui();
+    }
+  }
+  if (cities[selectedCityIndex].loaded_historical[selectedParamIndex] != true)
+  {
+    if (fetchHistorical(selectedCityIndex, selectedParamIndex))
     {
       update_ui();
     }
