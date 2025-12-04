@@ -228,7 +228,10 @@ bool is_it_twelve(const char time[])
 // --- NEW HELPER: Set Chart Range Dynamically ---
 void set_chart_range_by_parameter(int param_index) {
     int min_val, max_val;
-    int tick_count = 5; // Default tick count
+    int tick_count = 5; 
+    
+    // Increased Y-axis label area to 60 pixels for 4-digit numbers (Air Pressure)
+    const int Y_TICK_LENGTH = 60; 
 
     if (param_index == 0) { // Temperture (C)
         min_val = -20; max_val = 30;
@@ -245,7 +248,9 @@ void set_chart_range_by_parameter(int param_index) {
     }
     
     lv_chart_set_range(history_chart, LV_CHART_AXIS_PRIMARY_Y, min_val, max_val);
-    lv_chart_set_axis_tick(history_chart, LV_CHART_AXIS_PRIMARY_Y, 10, 5, tick_count, 2, true, 40);
+    
+    // Last parameter (60) controls the space for the label
+    lv_chart_set_axis_tick(history_chart, LV_CHART_AXIS_PRIMARY_Y, 10, 5, tick_count, 2, true, Y_TICK_LENGTH);
 }
 
 // --- LOGIC FOR HISTORY SCROLLING ---
@@ -263,7 +268,7 @@ void update_history_view(int slider_index) {
     if (slider_index < 0) slider_index = 0;
     if (slider_index >= total_count) slider_index = total_count - 1;
 
-    // 1. Update the Info Label (Top) - REMOVED INDEX INFO
+    // 1. Update the Info Label (Top)
     char buf[64];
     snprintf(buf, sizeof(buf), "%s: %.1f", 
              parameters[selectedParamIndex].label, 
