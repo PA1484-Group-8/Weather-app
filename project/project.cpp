@@ -18,13 +18,12 @@ LilyGo_Class amoled;
 static lv_obj_t *tileview;
 static lv_obj_t *t0; // Boot screen tile (Screen 1)
 static lv_obj_t *t1; // Forecast (Screen 2)
-static lv_obj_t *t2; // Historical (Screen 3) - TARGET FOR SLIDER
+static lv_obj_t *t2; // Historical (Screen 3)
 static lv_obj_t *t3; // Settings
 static lv_obj_t *t4; // Wifi
 
 static lv_obj_t *t0_label; 
 static lv_obj_t *t1_label;
-// t2_label is replaced by the chart/slider widgets below
 
 // --- HISTORICAL DATA WIDGETS (For t2) ---
 static lv_obj_t *history_chart;
@@ -226,8 +225,30 @@ bool is_it_twelve(const char time[])
   return true;
 }
 
-// --- LOGIC FOR HISTORY SCROLLING ---
+// --- NEW HELPER: Set Chart Range Dynamically ---
+void set_chart_range_by_parameter(int param_index) {
+    int min_val, max_val;
+    int tick_count = 5; // Default tick count
 
+    if (param_index == 0) { // Temperture (C)
+        min_val = -20; max_val = 30;
+    } else if (param_index == 1) { // Humiditiy (%)
+        min_val = 0; max_val = 100;
+        tick_count = 6;
+    } else if (param_index == 2) { // Wind speed (m/s)
+        min_val = 0; max_val = 30;
+    } else if (param_index == 3) { // Air pressure (hPa)
+        min_val = 950; max_val = 1050;
+        tick_count = 6;
+    } else {
+        min_val = 0; max_val = 100; // Default safe range
+    }
+    
+    lv_chart_set_range(history_chart, LV_CHART_AXIS_PRIMARY_Y, min_val, max_val);
+    lv_chart_set_axis_tick(history_chart, LV_CHART_AXIS_PRIMARY_Y, 10, 5, tick_count, 2, true, 40);
+}
+
+// --- LOGIC FOR HISTORY SCROLLING ---
 /**
  * @brief Updates the chart to show a window of data ending at `slider_index`
  */
@@ -242,20 +263,15 @@ void update_history_view(int slider_index) {
     if (slider_index < 0) slider_index = 0;
     if (slider_index >= total_count) slider_index = total_count - 1;
 
-    // 1. Update the Info Label (Top)
-    // Display value and how many hours ago this point was
+    // 1. Update the Info Label (Top) - REMOVED INDEX INFO
     char buf[64];
-    snprintf(buf, sizeof(buf), "%s: %.1f\n(Index: %d / %d)", 
+    snprintf(buf, sizeof(buf), "%s: %.1f", 
              parameters[selectedParamIndex].label, 
-             values[slider_index], 
-             slider_index, total_count); 
+             values[slider_index]); 
     lv_label_set_text(history_info_label, buf);
 
     // 2. Update the Chart
-    // We want the slider_index to be the "latest" point visible on the graph
     int start_idx = slider_index - (CHART_WINDOW_SIZE - 1);
-    
-    // We must manually fill the chart series
     lv_chart_set_point_count(history_chart, CHART_WINDOW_SIZE);
     
     for(int i = 0; i < CHART_WINDOW_SIZE; i++) {
@@ -264,7 +280,6 @@ void update_history_view(int slider_index) {
         if(current_data_idx >= 0 && current_data_idx < total_count) {
              lv_chart_set_next_value(history_chart, history_series, (lv_coord_t)values[current_data_idx]);
         } else {
-             // If we scroll too far left (negative index), pad with 0 or the first value
              if(total_count > 0 && current_data_idx < 0) 
                  lv_chart_set_next_value(history_chart, history_series, (lv_coord_t)values[0]);
              else 
@@ -308,6 +323,9 @@ void update_ui()
   // --- Update Tile 2 (Historical Data) ---
   int count = cities[selectedCityIndex].history[selectedParamIndex].count;
   
+  // Always update chart range based on the currently selected parameter
+  set_chart_range_by_parameter(selectedParamIndex);
+
   if (count > 0)
   {
       // 1. Configure Slider Range: 0 to (Total items - 1)
@@ -423,7 +441,10 @@ static void create_ui()
   lv_obj_set_size(history_chart, 200, 200); 
   lv_obj_align(history_chart, LV_ALIGN_CENTER, 0, 0);
   lv_chart_set_type(history_chart, LV_CHART_TYPE_LINE); 
-  lv_chart_set_range(history_chart, LV_CHART_AXIS_PRIMARY_Y, -20, 30); // Approximate range
+  
+  // Set initial range based on current selection (default is temp)
+  set_chart_range_by_parameter(selectedParamIndex); 
+  
   lv_chart_set_point_count(history_chart, CHART_WINDOW_SIZE); 
   
   history_series = lv_chart_add_series(history_chart, lv_palette_main(LV_PALETTE_RED), LV_CHART_AXIS_PRIMARY_Y);
@@ -619,6 +640,7 @@ void loop()
   lv_timer_handler(); 
   if (millis() - last_wifi_update > 500) { update_wifi_status(); last_wifi_update = millis(); }
 
+  // Re-fetch data if the user changes city or parameter
   if (cities[selectedCityIndex].loaded_forcast != true) {
     if (fetchForcast(selectedCityIndex)) { update_ui(); }
   }
