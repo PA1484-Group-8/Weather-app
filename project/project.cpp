@@ -29,7 +29,9 @@ static lv_obj_t *t1_label;
 static lv_obj_t *history_chart;
 static lv_chart_series_t *history_series;
 static lv_obj_t *history_slider;
-static lv_obj_t *history_info_label;     // Shows value and timestamp index
+static lv_obj_t *history_location_label; // Shows the selected city name
+static lv_obj_t *history_info_label;     // Shows parameter and value
+static lv_obj_t *history_datetime_label; // Shows the date/time of the slider position
 static const int CHART_WINDOW_SIZE = 24; // Show 24 hours at a time
 
 static lv_obj_t *t4_label;
@@ -207,6 +209,7 @@ struct HistoricalSeries
 {
   static constexpr int MAX_HOURS = 4000;
   float *values = nullptr;
+  char **timestamps = nullptr; // To store full timestamps
   int count = 0;
   bool isLoaded = false;
 };
@@ -278,6 +281,25 @@ static void update_wifi_status()
   }
 }
 
+// Helper to format timestamp string into "YYYY-MM-DD HH:00"
+void formatTimestamp(const char *timestamp, char *output, size_t outputSize)
+{
+    if (strlen(timestamp) < 16) { 
+        snprintf(output, outputSize, "No Data"); 
+        return; 
+    }
+    // Expected format: YYYY-MM-DDTHH:MM:SSZ
+    int year, month, day, hour, minute;
+    // Extracting Year, Month, Day, Hour, Minute
+    if (sscanf(timestamp, "%d-%d-%dT%d:%d", &year, &month, &day, &hour, &minute) == 5) {
+        // We only care about the hour, rounding minute down to 00
+        snprintf(output, outputSize, "%d-%02d-%02d %02d:00", year, month, day, hour);
+    } else {
+        snprintf(output, outputSize, "Invalid Time");
+    }
+}
+
+
 void formatDate(const char *timestamp, char *output, size_t outputSize)
 {
   if (strlen(timestamp) < 10)
@@ -310,13 +332,13 @@ bool is_it_twelve(const char time[])
   return true;
 }
 
-// --- NEW HELPER: Set Chart Range Dynamically ---
+// --- Set Chart Range Dynamically ---
 void set_chart_range_by_parameter(int param_index)
 {
   int min_val, max_val;
   int tick_count = 5;
 
-  // Increased Y-axis label area to 60 pixels for 4-digit numbers (Air Pressure)
+  // Y-axis label area for 4-digit numbers (e.g., 1050)
   const int Y_TICK_LENGTH = 60;
 
   if (param_index == 0)
@@ -363,8 +385,10 @@ void update_history_view(int slider_index)
   if (!cities[selectedCityIndex].history[selectedParamIndex].isLoaded)
     return;
 
-  int total_count = cities[selectedCityIndex].history[selectedParamIndex].count;
-  float *values = cities[selectedCityIndex].history[selectedParamIndex].values;
+  HistoricalSeries &current_history = cities[selectedCityIndex].history[selectedParamIndex];
+  int total_count = current_history.count;
+  float *values = current_history.values;
+  char **timestamps = current_history.timestamps;
 
   // Bounds check
   if (slider_index < 0)
@@ -372,14 +396,23 @@ void update_history_view(int slider_index)
   if (slider_index >= total_count)
     slider_index = total_count - 1;
 
-  // 1. Update the Info Label (Top)
+  // 1. Update the Info Label (Parameter Value)
   char buf[64];
   snprintf(buf, sizeof(buf), "%s: %.1f",
            parameters[selectedParamIndex].label,
            values[slider_index]);
   lv_label_set_text(history_info_label, buf);
 
-  // 2. Update the Chart
+  // 2. Update the Date/Time Label
+  char time_buf[32];
+  if (timestamps != nullptr && timestamps[slider_index] != nullptr) {
+      formatTimestamp(timestamps[slider_index], time_buf, sizeof(time_buf));
+  } else {
+      snprintf(time_buf, sizeof(time_buf), "Timestamp N/A");
+  }
+  lv_label_set_text(history_datetime_label, time_buf);
+
+  // 3. Update the Chart
   int start_idx = slider_index - (CHART_WINDOW_SIZE - 1);
   lv_chart_set_point_count(history_chart, CHART_WINDOW_SIZE);
 
@@ -436,28 +469,32 @@ void update_ui()
 
   // --- Update Tile 2 (Historical Data) ---
   int count = cities[selectedCityIndex].history[selectedParamIndex].count;
+  
+  // 1. Update Location Label
+  lv_label_set_text(history_location_label, cities[selectedCityIndex].name);
 
   // Always update chart range based on the currently selected parameter
   set_chart_range_by_parameter(selectedParamIndex);
 
   if (count > 0)
   {
-    // 1. Configure Slider Range: 0 to (Total items - 1)
+    // 2. Configure Slider Range: 0 to (Total items - 1)
     lv_slider_set_range(history_slider, 0, count - 1);
 
-    // 2. Set Slider to "Latest" (Far right)
+    // 3. Set Slider to "Latest" (Far right)
     lv_slider_set_value(history_slider, count - 1, LV_ANIM_ON);
 
-    // 3. Enable Slider
+    // 4. Enable Slider
     lv_obj_clear_state(history_slider, LV_STATE_DISABLED);
 
-    // 4. Update Chart and Label to show the latest data window
+    // 5. Update Chart, Info Label, and Time Label
     update_history_view(count - 1);
   }
   else
   {
-    lv_label_set_text(history_info_label, "Historical Data: No Data Loaded");
-    lv_chart_set_point_count(history_chart, 0);          // Clear chart
+    lv_label_set_text(history_info_label, parameters[selectedParamIndex].label);
+    lv_label_set_text(history_datetime_label, "No Data Loaded"); // Clear time label
+    lv_chart_set_point_count(history_chart, 0);       // Clear chart
     lv_obj_add_state(history_slider, LV_STATE_DISABLED); // Disable slider
   }
 
@@ -472,6 +509,11 @@ void settings_value_changed(lv_event_t *e)
   if (obj == city_dropdown)
   {
     selectedCityIndex = lv_dropdown_get_selected(obj);
+    // Clear historical flags for the new city
+    for(int i = 0; i < PARAM_COUNT; ++i) {
+        cities[selectedCityIndex].loaded_historical[i] = false;
+    }
+    cities[selectedCityIndex].loaded_forcast = false;
     lv_label_set_text(settings_status_label, "City selected - updating UI...");
   }
   else if (obj == param_dropdown)
@@ -518,6 +560,28 @@ static void get_saved_preferences()
 // Function: Creates UI
 static void create_ui()
 {
+  // --- STYLES FOR SETTINGS TILE ---
+  
+  // Style for all button and dropdown text (using known available font 28)
+  static lv_style_t style_text_large;
+  lv_style_init(&style_text_large);
+  lv_style_set_text_font(&style_text_large, &montserrat_se_28); 
+
+  // Style for the dropdown container/button part (Custom border/bg)
+  static lv_style_t style_dropdown_clean;
+  lv_style_init(&style_dropdown_clean);
+  lv_style_set_bg_color(&style_dropdown_clean, lv_color_white()); // Fixed args
+  lv_style_set_border_width(&style_dropdown_clean, 2); // Fixed args
+  lv_style_set_border_color(&style_dropdown_clean, lv_palette_main(LV_PALETTE_BLUE)); // Fixed args
+  lv_style_set_text_font(&style_dropdown_clean, &montserrat_se_28); // Fixed args
+  lv_style_set_pad_all(&style_dropdown_clean, 5); // Fixed args
+
+  // Style for the dropdown list (Menu)
+  static lv_style_t style_dropdown_list;
+  lv_style_init(&style_dropdown_list);
+  lv_style_set_text_font(&style_dropdown_list, &montserrat_se_28);
+
+  // --- BASE LAYOUT ---
   tileview = lv_tileview_create(lv_scr_act());
   lv_obj_set_size(tileview, lv_disp_get_hor_res(NULL), lv_disp_get_ver_res(NULL));
   lv_obj_set_scrollbar_mode(tileview, LV_SCROLLBAR_MODE_OFF);
@@ -548,16 +612,28 @@ static void create_ui()
   // --- Tile #2 (Screen 3) - Historical Weather ---
   apply_tile_colors(t2);
 
-  // 1. Info Label (Top)
+  // Location Label (Top Center)
+  history_location_label = lv_label_create(t2);
+  lv_label_set_text(history_location_label, cities[selectedCityIndex].name);
+  lv_obj_set_style_text_font(history_location_label, &montserrat_se_28, 0);
+  lv_obj_align(history_location_label, LV_ALIGN_TOP_MID, 0, 10);
+
+  // Info Label (Parameter Value)
   history_info_label = lv_label_create(t2);
   lv_label_set_text(history_info_label, "History: Loading...");
   lv_obj_set_style_text_font(history_info_label, &montserrat_se_28, 0);
-  lv_obj_align(history_info_label, LV_ALIGN_TOP_MID, 0, 20);
+  lv_obj_align(history_info_label, LV_ALIGN_TOP_MID, 0, 40);
 
-  // 2. Chart (Middle)
+  // Date/Time Label (Below Info)
+  history_datetime_label = lv_label_create(t2);
+  lv_label_set_text(history_datetime_label, "Date/Time N/A");
+  lv_obj_set_style_text_font(history_datetime_label, &montserrat_se_28, 0);
+  lv_obj_align(history_datetime_label, LV_ALIGN_TOP_MID, 0, 75); 
+
+  // Chart (Middle)
   history_chart = lv_chart_create(t2);
-  lv_obj_set_size(history_chart, 200, 200);
-  lv_obj_align(history_chart, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_set_size(history_chart, 200, 180); 
+  lv_obj_align(history_chart, LV_ALIGN_CENTER, 0, 10);
   lv_chart_set_type(history_chart, LV_CHART_TYPE_LINE);
 
   // Set initial range based on current selection (default is temp)
@@ -567,20 +643,22 @@ static void create_ui()
 
   history_series = lv_chart_add_series(history_chart, lv_palette_main(LV_PALETTE_RED), LV_CHART_AXIS_PRIMARY_Y);
 
-  // 3. Slider (Bottom)
+  // Slider (Bottom)
   history_slider = lv_slider_create(t2);
   lv_obj_set_width(history_slider, 200);
-  lv_obj_align(history_slider, LV_ALIGN_BOTTOM_MID, 0, -30);
+  lv_obj_align(history_slider, LV_ALIGN_BOTTOM_MID, 0, -10); 
   lv_obj_add_event_cb(history_slider, history_slider_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
   lv_obj_add_state(history_slider, LV_STATE_DISABLED); // Disabled until data loads
 
-  // Tile #3 - Settings
+
+  // --- Tile #3 - Settings ---
   lv_obj_t *t3_label = lv_label_create(t3);
   lv_label_set_text(t3_label, "Settings");
-  lv_obj_set_style_text_font(t3_label, &montserrat_se_28, 0);
+  lv_obj_set_style_text_font(t3_label, &montserrat_se_28, 0); 
   lv_obj_align(t3_label, LV_ALIGN_TOP_MID, 0, 6);
   apply_tile_colors(t3);
 
+  // --- Dropdowns (City & Parameter) ---
   String cityOptions;
   for (int i = 0; i < CITY_COUNT; ++i)
   {
@@ -590,11 +668,11 @@ static void create_ui()
   }
   city_dropdown = lv_dropdown_create(t3);
   lv_dropdown_set_options(city_dropdown, cityOptions.c_str());
-  lv_obj_set_width(city_dropdown, 200);
-  lv_obj_align(city_dropdown, LV_ALIGN_TOP_LEFT, 10, 50);
-  lv_obj_set_style_text_font(city_dropdown, &montserrat_se_28, 0);
+  lv_obj_set_size(city_dropdown, 220, 50); // Sized
+  lv_obj_align(city_dropdown, LV_ALIGN_TOP_LEFT, 10, 60);
+  lv_obj_add_style(city_dropdown, &style_dropdown_clean, LV_PART_MAIN); 
   lv_obj_t *list = lv_dropdown_get_list(city_dropdown);
-  lv_obj_set_style_text_font(list, &montserrat_se_28, LV_PART_MAIN);
+  lv_obj_add_style(list, &style_dropdown_list, LV_PART_MAIN); 
   lv_dropdown_set_selected(city_dropdown, selectedCityIndex);
   lv_obj_add_event_cb(city_dropdown, settings_value_changed, LV_EVENT_VALUE_CHANGED, NULL);
 
@@ -607,31 +685,38 @@ static void create_ui()
   }
   param_dropdown = lv_dropdown_create(t3);
   lv_dropdown_set_options(param_dropdown, paramOptions.c_str());
-  lv_obj_set_width(param_dropdown, 200);
-  lv_obj_align(param_dropdown, LV_ALIGN_TOP_LEFT, 10, 100);
-  lv_obj_set_style_text_font(param_dropdown, &montserrat_se_28, 0);
+  lv_obj_set_size(param_dropdown, 220, 50); // Sized
+  lv_obj_align(param_dropdown, LV_ALIGN_TOP_LEFT, 10, 130);
+  lv_obj_add_style(param_dropdown, &style_dropdown_clean, LV_PART_MAIN); 
   lv_obj_t *list2 = lv_dropdown_get_list(param_dropdown);
-  lv_obj_set_style_text_font(list2, &montserrat_se_28, LV_PART_MAIN);
+  lv_obj_add_style(list2, &style_dropdown_list, LV_PART_MAIN); 
   lv_dropdown_set_selected(param_dropdown, selectedParamIndex);
   lv_obj_add_event_cb(param_dropdown, settings_value_changed, LV_EVENT_VALUE_CHANGED, NULL);
 
+  // --- Buttons ---
   btn_save_default = lv_btn_create(t3);
-  lv_obj_align(btn_save_default, LV_ALIGN_TOP_RIGHT, -10, 50);
-  lv_obj_set_width(btn_save_default, 160);
+  lv_obj_align(btn_save_default, LV_ALIGN_TOP_RIGHT, -10, 60);
+  lv_obj_set_size(btn_save_default, 180, 50); // Sized
+  lv_obj_add_style(btn_save_default, &style_text_large, LV_PART_MAIN);
   lv_obj_t *lbl_save = lv_label_create(btn_save_default);
   lv_label_set_text(lbl_save, "Save Default");
+  lv_obj_center(lbl_save);
   lv_obj_add_event_cb(btn_save_default, on_save_defaults, LV_EVENT_CLICKED, NULL);
 
   btn_reset_defaults = lv_btn_create(t3);
-  lv_obj_align(btn_reset_defaults, LV_ALIGN_BOTTOM_RIGHT, -10, -50);
-  lv_obj_set_width(btn_reset_defaults, 160);
+  lv_obj_align(btn_reset_defaults, LV_ALIGN_TOP_RIGHT, -10, 130); // Aligned next to Parameter
+  lv_obj_set_size(btn_reset_defaults, 180, 50); // Sized
+  lv_obj_add_style(btn_reset_defaults, &style_text_large, LV_PART_MAIN);
   lv_obj_t *lbl_reset = lv_label_create(btn_reset_defaults);
   lv_label_set_text(lbl_reset, "Reset Default");
+  lv_obj_center(lbl_reset);
   lv_obj_add_event_cb(btn_reset_defaults, on_reset_deaults, LV_EVENT_CLICKED, NULL);
 
+  // Status label (at bottom)
   settings_status_label = lv_label_create(t3);
   lv_label_set_text(settings_status_label, "");
-  lv_obj_align(settings_status_label, LV_ALIGN_TOP_MID, 0, 170);
+  lv_obj_set_style_text_font(settings_status_label, &montserrat_se_28, 0); 
+  lv_obj_align(settings_status_label, LV_ALIGN_BOTTOM_MID, 0, -10);
 
   // Tile #4 - Wifi
   t4_label = lv_label_create(t4);
@@ -756,17 +841,46 @@ bool fetchHistorical(int c, int p)
   Serial.printf("Fetching History (%s) for %s...\n", parameters[p].label, cities[c].name);
   if (fetchJsonFromServer(histUrl, doc))
   {
+    HistoricalSeries &current_history = cities[c].history[p];
+
+    // Allocate memory for timestamps (30 chars max including null terminator)
+    if (current_history.timestamps == nullptr) {
+        current_history.timestamps = (char **)ps_malloc(HistoricalSeries::MAX_HOURS * sizeof(char *));
+        if (current_history.timestamps == nullptr) {
+            Serial.println("FATAL: Failed to allocate timestamp pointers!");
+            return false;
+        }
+    }
+
     JsonArray days = doc["value"].as<JsonArray>();
     int idx = 0;
     for (JsonVariant day : days)
     {
       if (idx >= HistoricalSeries::MAX_HOURS)
         break;
-      cities[c].history[p].values[idx] = day["value"].as<float>();
+
+      // Ensure timestamp memory is allocated for this point
+      if (current_history.timestamps[idx] == nullptr) {
+          current_history.timestamps[idx] = (char *)ps_malloc(30 * sizeof(char));
+          if (current_history.timestamps[idx] == nullptr) {
+              Serial.printf("FATAL: Failed to allocate memory for timestamp index %d!\n", idx);
+              break;
+          }
+      }
+
+      current_history.values[idx] = day["value"].as<float>();
+      const char *timestamp_str = day["date"].as<const char *>();
+      if (timestamp_str) {
+          strncpy(current_history.timestamps[idx], timestamp_str, 29);
+          current_history.timestamps[idx][29] = '\0';
+      } else {
+          current_history.timestamps[idx][0] = '\0';
+      }
+      
       idx++;
     }
-    cities[c].history[p].count = idx;
-    cities[c].history[p].isLoaded = true;
+    current_history.count = idx;
+    current_history.isLoaded = true;
     cities[c].loaded_historical[p] = true;
     return true;
   }
@@ -779,6 +893,7 @@ void setup()
   {
     for (int j = 0; j < PARAM_COUNT; ++j)
     {
+      // Allocate values array
       cities[i].history[j].values = (float *)ps_malloc(HistoricalSeries::MAX_HOURS * sizeof(float));
       if (cities[i].history[j].values == nullptr)
       {
@@ -786,6 +901,7 @@ void setup()
         while (true)
           ;
       }
+      // Timestamps will be allocated in fetchHistorical now
     }
   }
   Serial.begin(115200);
