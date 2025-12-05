@@ -10,8 +10,8 @@
 #include <time.h>
 
 // Wi-Fi credentials
-static const char *WIFI_SSID = "AN";
-static const char *WIFI_PASSWORD = "3feC=Mic@iKsi&Da";
+static const char *WIFI_SSID = "BTH_Guest";
+static const char *WIFI_PASSWORD = "paprika45svart";
 
 LilyGo_Class amoled;
 
@@ -22,37 +22,58 @@ static lv_obj_t *t2; // Historical (Screen 3)
 static lv_obj_t *t3; // Settings
 static lv_obj_t *t4; // Wifi
 
-static lv_obj_t *t0_label; 
+static lv_obj_t *t0_label;
 static lv_obj_t *t1_label;
 
 // --- HISTORICAL DATA WIDGETS (For t2) ---
 static lv_obj_t *history_chart;
 static lv_chart_series_t *history_series;
 static lv_obj_t *history_slider;
-static lv_obj_t *history_info_label; // Shows value and timestamp index
+static lv_obj_t *history_info_label;     // Shows value and timestamp index
 static const int CHART_WINDOW_SIZE = 24; // Show 24 hours at a time
 
-static lv_obj_t *t4_label; 
+static lv_obj_t *t4_label;
 
 // track Wi-Fi connection
 static bool wifi_was_connected = false;
-static unsigned long last_wifi_update = 0; 
+static unsigned long last_wifi_update = 0;
+bool ui_updated = true;
 
-Preferences preferences; 
+Preferences preferences;
 
 // --- WEATHER STRUCTURES (Unchanged) ---
 struct WeatherCondition
 {
   enum Value : int
   {
-    Unknown = 0, ClearSky = 1, NearlyClearSky = 2, VariableCloudiness = 3,
-    HalfClearSky = 4, CloudySky = 5, Overcast = 6, Fog = 7,
-    LightRainShowers = 8, ModerateRainShowers = 9, HeavyRainShowers = 10,
-    Thunderstorm = 11, LightSleetShowers = 12, ModerateSleetShowers = 13,
-    HeavySleetShowers = 14, LightSnowShowers = 15, ModerateSnowShowers = 16,
-    HeavySnowShowers = 17, LightRain = 18, ModerateRain = 19, HeavyRain = 20,
-    Thunder = 21, LightSleet = 22, ModerateSleet = 23, HeavySleet = 24,
-    LightSnowfall = 25, ModerateSnowfall = 26, HeavySnowfall = 27
+    Unknown = 0,
+    ClearSky = 1,
+    NearlyClearSky = 2,
+    VariableCloudiness = 3,
+    HalfClearSky = 4,
+    CloudySky = 5,
+    Overcast = 6,
+    Fog = 7,
+    LightRainShowers = 8,
+    ModerateRainShowers = 9,
+    HeavyRainShowers = 10,
+    Thunderstorm = 11,
+    LightSleetShowers = 12,
+    ModerateSleetShowers = 13,
+    HeavySleetShowers = 14,
+    LightSnowShowers = 15,
+    ModerateSnowShowers = 16,
+    HeavySnowShowers = 17,
+    LightRain = 18,
+    ModerateRain = 19,
+    HeavyRain = 20,
+    Thunder = 21,
+    LightSleet = 22,
+    ModerateSleet = 23,
+    HeavySleet = 24,
+    LightSnowfall = 25,
+    ModerateSnowfall = 26,
+    HeavySnowfall = 27
   };
   Value value;
   WeatherCondition() = default;
@@ -61,56 +82,109 @@ struct WeatherCondition
 
 const char *getWeatherSymbol(WeatherCondition symbol)
 {
-  switch (symbol.value) {
-  case WeatherCondition::ClearSky: case WeatherCondition::NearlyClearSky: return "☀"; 
-  case WeatherCondition::VariableCloudiness: case WeatherCondition::HalfClearSky: return "⛅"; 
-  case WeatherCondition::CloudySky: case WeatherCondition::Overcast: return "☁"; 
-  case WeatherCondition::Fog: return "🌫"; 
-  case WeatherCondition::LightRainShowers: case WeatherCondition::ModerateRainShowers:
-  case WeatherCondition::LightRain: case WeatherCondition::ModerateRain: return "🌧"; 
-  case WeatherCondition::HeavyRainShowers: case WeatherCondition::HeavyRain: return "⛈"; 
-  case WeatherCondition::Thunderstorm: case WeatherCondition::Thunder: return "⚡"; 
-  case WeatherCondition::LightSleetShowers: case WeatherCondition::ModerateSleetShowers:
-  case WeatherCondition::HeavySleetShowers: case WeatherCondition::LightSleet:
-  case WeatherCondition::ModerateSleet: case WeatherCondition::HeavySleet: return "🌨"; 
-  case WeatherCondition::LightSnowShowers: case WeatherCondition::ModerateSnowShowers:
-  case WeatherCondition::HeavySnowShowers: case WeatherCondition::LightSnowfall:
-  case WeatherCondition::ModerateSnowfall: case WeatherCondition::HeavySnowfall: return "❄"; 
-  default: return "?"; 
+  switch (symbol.value)
+  {
+  case WeatherCondition::ClearSky:
+  case WeatherCondition::NearlyClearSky:
+    return "☀";
+  case WeatherCondition::VariableCloudiness:
+  case WeatherCondition::HalfClearSky:
+    return "⛅";
+  case WeatherCondition::CloudySky:
+  case WeatherCondition::Overcast:
+    return "☁";
+  case WeatherCondition::Fog:
+    return "🌫";
+  case WeatherCondition::LightRainShowers:
+  case WeatherCondition::ModerateRainShowers:
+  case WeatherCondition::LightRain:
+  case WeatherCondition::ModerateRain:
+    return "🌧";
+  case WeatherCondition::HeavyRainShowers:
+  case WeatherCondition::HeavyRain:
+    return "⛈";
+  case WeatherCondition::Thunderstorm:
+  case WeatherCondition::Thunder:
+    return "⚡";
+  case WeatherCondition::LightSleetShowers:
+  case WeatherCondition::ModerateSleetShowers:
+  case WeatherCondition::HeavySleetShowers:
+  case WeatherCondition::LightSleet:
+  case WeatherCondition::ModerateSleet:
+  case WeatherCondition::HeavySleet:
+    return "🌨";
+  case WeatherCondition::LightSnowShowers:
+  case WeatherCondition::ModerateSnowShowers:
+  case WeatherCondition::HeavySnowShowers:
+  case WeatherCondition::LightSnowfall:
+  case WeatherCondition::ModerateSnowfall:
+  case WeatherCondition::HeavySnowfall:
+    return "❄";
+  default:
+    return "?";
   }
 }
 
 const char *getWeatherString(WeatherCondition symbol)
 {
-  switch (symbol.value) {
-  case WeatherCondition::ClearSky: return "Clear";
-  case WeatherCondition::NearlyClearSky: return "Mostly Clear";
-  case WeatherCondition::VariableCloudiness: return "Partly Cloudy";
-  case WeatherCondition::HalfClearSky: return "Partly Cloudy";
-  case WeatherCondition::CloudySky: return "Cloudy";
-  case WeatherCondition::Overcast: return "Overcast";
-  case WeatherCondition::Fog: return "Fog";
-  case WeatherCondition::LightRainShowers: return "Light Rain";
-  case WeatherCondition::ModerateRainShowers: return "Rain";
-  case WeatherCondition::HeavyRainShowers: return "Heavy Rain";
-  case WeatherCondition::Thunderstorm: return "Thunderstorm";
-  case WeatherCondition::LightSleetShowers: return "Light Sleet";
-  case WeatherCondition::ModerateSleetShowers: return "Sleet";
-  case WeatherCondition::HeavySleetShowers: return "Heavy Sleet";
-  case WeatherCondition::LightSnowShowers: return "Light Snow";
-  case WeatherCondition::ModerateSnowShowers: return "Snow";
-  case WeatherCondition::HeavySnowShowers: return "Heavy Snow";
-  case WeatherCondition::LightRain: return "Light Rain";
-  case WeatherCondition::ModerateRain: return "Rain";
-  case WeatherCondition::HeavyRain: return "Heavy Rain";
-  case WeatherCondition::Thunder: return "Thunder";
-  case WeatherCondition::LightSleet: return "Light Sleet";
-  case WeatherCondition::ModerateSleet: return "Sleet";
-  case WeatherCondition::HeavySleet: return "Heavy Sleet";
-  case WeatherCondition::LightSnowfall: return "Light Snow";
-  case WeatherCondition::ModerateSnowfall: return "Snow";
-  case WeatherCondition::HeavySnowfall: return "Heavy Snow";
-  default: return "Unknown";
+  switch (symbol.value)
+  {
+  case WeatherCondition::ClearSky:
+    return "Clear";
+  case WeatherCondition::NearlyClearSky:
+    return "Mostly Clear";
+  case WeatherCondition::VariableCloudiness:
+    return "Partly Cloudy";
+  case WeatherCondition::HalfClearSky:
+    return "Partly Cloudy";
+  case WeatherCondition::CloudySky:
+    return "Cloudy";
+  case WeatherCondition::Overcast:
+    return "Overcast";
+  case WeatherCondition::Fog:
+    return "Fog";
+  case WeatherCondition::LightRainShowers:
+    return "Light Rain";
+  case WeatherCondition::ModerateRainShowers:
+    return "Rain";
+  case WeatherCondition::HeavyRainShowers:
+    return "Heavy Rain";
+  case WeatherCondition::Thunderstorm:
+    return "Thunderstorm";
+  case WeatherCondition::LightSleetShowers:
+    return "Light Sleet";
+  case WeatherCondition::ModerateSleetShowers:
+    return "Sleet";
+  case WeatherCondition::HeavySleetShowers:
+    return "Heavy Sleet";
+  case WeatherCondition::LightSnowShowers:
+    return "Light Snow";
+  case WeatherCondition::ModerateSnowShowers:
+    return "Snow";
+  case WeatherCondition::HeavySnowShowers:
+    return "Heavy Snow";
+  case WeatherCondition::LightRain:
+    return "Light Rain";
+  case WeatherCondition::ModerateRain:
+    return "Rain";
+  case WeatherCondition::HeavyRain:
+    return "Heavy Rain";
+  case WeatherCondition::Thunder:
+    return "Thunder";
+  case WeatherCondition::LightSleet:
+    return "Light Sleet";
+  case WeatherCondition::ModerateSleet:
+    return "Sleet";
+  case WeatherCondition::HeavySleet:
+    return "Heavy Sleet";
+  case WeatherCondition::LightSnowfall:
+    return "Light Snow";
+  case WeatherCondition::ModerateSnowfall:
+    return "Snow";
+  case WeatherCondition::HeavySnowfall:
+    return "Heavy Snow";
+  default:
+    return "Unknown";
   }
 }
 
@@ -131,7 +205,7 @@ struct Parameter
 
 struct HistoricalSeries
 {
-  static constexpr int MAX_HOURS = 4000; 
+  static constexpr int MAX_HOURS = 4000;
   float *values = nullptr;
   int count = 0;
   bool isLoaded = false;
@@ -143,8 +217,8 @@ struct City
   const char *lat;
   const char *lon;
   const char *stationID;
-  ForcastHourlyWeather forecast[7]; 
-  HistoricalSeries history[4]; 
+  ForcastHourlyWeather forecast[7];
+  HistoricalSeries history[4];
   bool loaded_forcast;
   bool loaded_historical[4];
 };
@@ -193,7 +267,7 @@ static void update_wifi_status()
     snprintf(buf, sizeof(buf), "Wi-Fi: %s\nIP: %d.%d.%d.%d",
              WiFi.SSID().c_str(), ip[0], ip[1], ip[2], ip[3]);
     lv_label_set_text(t4_label, buf);
-    lv_obj_center(t4_label); 
+    lv_obj_center(t4_label);
     wifi_was_connected = true;
   }
   else if (current_status != WL_CONNECTED && wifi_was_connected)
@@ -206,14 +280,21 @@ static void update_wifi_status()
 
 void formatDate(const char *timestamp, char *output, size_t outputSize)
 {
-  if (strlen(timestamp) < 10) { snprintf(output, outputSize, "???"); return; }
+  if (strlen(timestamp) < 10)
+  {
+    snprintf(output, outputSize, "???");
+    return;
+  }
   int year, month, day;
   sscanf(timestamp, "%d-%d-%d", &year, &month, &day);
   const char *monthNames[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
                               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-  if (month >= 1 && month <= 12) {
+  if (month >= 1 && month <= 12)
+  {
     snprintf(output, outputSize, "%s %d", monthNames[month - 1], day);
-  } else {
+  }
+  else
+  {
     snprintf(output, outputSize, "???");
   }
 }
@@ -221,84 +302,112 @@ void formatDate(const char *timestamp, char *output, size_t outputSize)
 bool is_it_twelve(const char time[])
 {
   char pattern[] = "____-__-___12:00:00_";
-  for (int j = 11; j < 15; j++) { if (pattern[j] != time[j]) return false; }
+  for (int j = 11; j < 15; j++)
+  {
+    if (pattern[j] != time[j])
+      return false;
+  }
   return true;
 }
 
 // --- NEW HELPER: Set Chart Range Dynamically ---
-void set_chart_range_by_parameter(int param_index) {
-    int min_val, max_val;
-    int tick_count = 5; 
-    
-    // Increased Y-axis label area to 60 pixels for 4-digit numbers (Air Pressure)
-    const int Y_TICK_LENGTH = 60; 
+void set_chart_range_by_parameter(int param_index)
+{
+  int min_val, max_val;
+  int tick_count = 5;
 
-    if (param_index == 0) { // Temperture (C)
-        min_val = -20; max_val = 30;
-    } else if (param_index == 1) { // Humiditiy (%)
-        min_val = 0; max_val = 100;
-        tick_count = 6;
-    } else if (param_index == 2) { // Wind speed (m/s)
-        min_val = 0; max_val = 30;
-    } else if (param_index == 3) { // Air pressure (hPa)
-        min_val = 950; max_val = 1050;
-        tick_count = 6;
-    } else {
-        min_val = 0; max_val = 100; // Default safe range
-    }
-    
-    lv_chart_set_range(history_chart, LV_CHART_AXIS_PRIMARY_Y, min_val, max_val);
-    
-    // Last parameter (60) controls the space for the label
-    lv_chart_set_axis_tick(history_chart, LV_CHART_AXIS_PRIMARY_Y, 10, 5, tick_count, 2, true, Y_TICK_LENGTH);
+  // Increased Y-axis label area to 60 pixels for 4-digit numbers (Air Pressure)
+  const int Y_TICK_LENGTH = 60;
+
+  if (param_index == 0)
+  { // Temperture (C)
+    min_val = -20;
+    max_val = 30;
+  }
+  else if (param_index == 1)
+  { // Humiditiy (%)
+    min_val = 0;
+    max_val = 100;
+    tick_count = 6;
+  }
+  else if (param_index == 2)
+  { // Wind speed (m/s)
+    min_val = 0;
+    max_val = 30;
+  }
+  else if (param_index == 3)
+  { // Air pressure (hPa)
+    min_val = 950;
+    max_val = 1050;
+    tick_count = 6;
+  }
+  else
+  {
+    min_val = 0;
+    max_val = 100; // Default safe range
+  }
+
+  lv_chart_set_range(history_chart, LV_CHART_AXIS_PRIMARY_Y, min_val, max_val);
+
+  // Last parameter (60) controls the space for the label
+  lv_chart_set_axis_tick(history_chart, LV_CHART_AXIS_PRIMARY_Y, 10, 5, tick_count, 2, true, Y_TICK_LENGTH);
 }
 
 // --- LOGIC FOR HISTORY SCROLLING ---
 /**
  * @brief Updates the chart to show a window of data ending at `slider_index`
  */
-void update_history_view(int slider_index) {
-    // Basic safety checks
-    if (!cities[selectedCityIndex].history[selectedParamIndex].isLoaded) return;
+void update_history_view(int slider_index)
+{
+  // Basic safety checks
+  if (!cities[selectedCityIndex].history[selectedParamIndex].isLoaded)
+    return;
 
-    int total_count = cities[selectedCityIndex].history[selectedParamIndex].count;
-    float *values = cities[selectedCityIndex].history[selectedParamIndex].values;
-    
-    // Bounds check
-    if (slider_index < 0) slider_index = 0;
-    if (slider_index >= total_count) slider_index = total_count - 1;
+  int total_count = cities[selectedCityIndex].history[selectedParamIndex].count;
+  float *values = cities[selectedCityIndex].history[selectedParamIndex].values;
 
-    // 1. Update the Info Label (Top)
-    char buf[64];
-    snprintf(buf, sizeof(buf), "%s: %.1f", 
-             parameters[selectedParamIndex].label, 
-             values[slider_index]); 
-    lv_label_set_text(history_info_label, buf);
+  // Bounds check
+  if (slider_index < 0)
+    slider_index = 0;
+  if (slider_index >= total_count)
+    slider_index = total_count - 1;
 
-    // 2. Update the Chart
-    int start_idx = slider_index - (CHART_WINDOW_SIZE - 1);
-    lv_chart_set_point_count(history_chart, CHART_WINDOW_SIZE);
-    
-    for(int i = 0; i < CHART_WINDOW_SIZE; i++) {
-        int current_data_idx = start_idx + i;
-        
-        if(current_data_idx >= 0 && current_data_idx < total_count) {
-             lv_chart_set_next_value(history_chart, history_series, (lv_coord_t)values[current_data_idx]);
-        } else {
-             if(total_count > 0 && current_data_idx < 0) 
-                 lv_chart_set_next_value(history_chart, history_series, (lv_coord_t)values[0]);
-             else 
-                 lv_chart_set_next_value(history_chart, history_series, 0);
-        }
+  // 1. Update the Info Label (Top)
+  char buf[64];
+  snprintf(buf, sizeof(buf), "%s: %.1f",
+           parameters[selectedParamIndex].label,
+           values[slider_index]);
+  lv_label_set_text(history_info_label, buf);
+
+  // 2. Update the Chart
+  int start_idx = slider_index - (CHART_WINDOW_SIZE - 1);
+  lv_chart_set_point_count(history_chart, CHART_WINDOW_SIZE);
+
+  for (int i = 0; i < CHART_WINDOW_SIZE; i++)
+  {
+    int current_data_idx = start_idx + i;
+
+    if (current_data_idx >= 0 && current_data_idx < total_count)
+    {
+      lv_chart_set_next_value(history_chart, history_series, (lv_coord_t)values[current_data_idx]);
     }
-    lv_chart_refresh(history_chart);
+    else
+    {
+      if (total_count > 0 && current_data_idx < 0)
+        lv_chart_set_next_value(history_chart, history_series, (lv_coord_t)values[0]);
+      else
+        lv_chart_set_next_value(history_chart, history_series, 0);
+    }
+  }
+  lv_chart_refresh(history_chart);
 }
 
 // Callback for Slider Interaction
-static void history_slider_event_cb(lv_event_t *e) {
-    lv_obj_t *slider = lv_event_get_target(e);
-    int value = (int)lv_slider_get_value(slider);
-    update_history_view(value);
+static void history_slider_event_cb(lv_event_t *e)
+{
+  lv_obj_t *slider = lv_event_get_target(e);
+  int value = (int)lv_slider_get_value(slider);
+  update_history_view(value);
 }
 
 /**
@@ -306,7 +415,7 @@ static void history_slider_event_cb(lv_event_t *e) {
  */
 void update_ui()
 {
-  char buffer[2048]; 
+  char buffer[2048];
   char dateStr[16];
 
   // --- Update Tile 1: 7-Day Forecast ---
@@ -323,46 +432,50 @@ void update_ui()
     strcat(buffer, line);
   }
   lv_label_set_text(t1_label, buffer);
-  lv_obj_center(t1_label); 
+  lv_obj_center(t1_label);
 
   // --- Update Tile 2 (Historical Data) ---
   int count = cities[selectedCityIndex].history[selectedParamIndex].count;
-  
+
   // Always update chart range based on the currently selected parameter
   set_chart_range_by_parameter(selectedParamIndex);
 
   if (count > 0)
   {
-      // 1. Configure Slider Range: 0 to (Total items - 1)
-      lv_slider_set_range(history_slider, 0, count - 1);
-      
-      // 2. Set Slider to "Latest" (Far right)
-      lv_slider_set_value(history_slider, count - 1, LV_ANIM_ON);
+    // 1. Configure Slider Range: 0 to (Total items - 1)
+    lv_slider_set_range(history_slider, 0, count - 1);
 
-      // 3. Enable Slider
-      lv_obj_clear_state(history_slider, LV_STATE_DISABLED);
-      
-      // 4. Update Chart and Label to show the latest data window
-      update_history_view(count - 1);
+    // 2. Set Slider to "Latest" (Far right)
+    lv_slider_set_value(history_slider, count - 1, LV_ANIM_ON);
+
+    // 3. Enable Slider
+    lv_obj_clear_state(history_slider, LV_STATE_DISABLED);
+
+    // 4. Update Chart and Label to show the latest data window
+    update_history_view(count - 1);
   }
   else
   {
-      lv_label_set_text(history_info_label, "Historical Data: No Data Loaded");
-      lv_chart_set_point_count(history_chart, 0); // Clear chart
-      lv_obj_add_state(history_slider, LV_STATE_DISABLED); // Disable slider
+    lv_label_set_text(history_info_label, "Historical Data: No Data Loaded");
+    lv_chart_set_point_count(history_chart, 0);          // Clear chart
+    lv_obj_add_state(history_slider, LV_STATE_DISABLED); // Disable slider
   }
-  
+
   lv_label_set_text(settings_status_label, "");
 }
 
 // Settings callbacks
 void settings_value_changed(lv_event_t *e)
 {
+  ui_updated = true;
   lv_obj_t *obj = lv_event_get_target(e);
-  if (obj == city_dropdown) {
+  if (obj == city_dropdown)
+  {
     selectedCityIndex = lv_dropdown_get_selected(obj);
     lv_label_set_text(settings_status_label, "City selected - updating UI...");
-  } else if (obj == param_dropdown) {
+  }
+  else if (obj == param_dropdown)
+  {
     selectedParamIndex = lv_dropdown_get_selected(obj);
     lv_label_set_text(settings_status_label, "Parameters selected - updating UI...");
   }
@@ -370,7 +483,7 @@ void settings_value_changed(lv_event_t *e)
 
 static void on_save_defaults(lv_event_t *e)
 {
-  LV_UNUSED(e); 
+  LV_UNUSED(e);
   preferences.begin("weather", false);
   preferences.putUInt("city_idx", (uint32_t)selectedCityIndex);
   preferences.putUInt("param_idx", (uint32_t)selectedParamIndex);
@@ -381,7 +494,7 @@ static void on_save_defaults(lv_event_t *e)
 
 static void on_reset_deaults(lv_event_t *e)
 {
-  LV_UNUSED(e); 
+  LV_UNUSED(e);
   selectedCityIndex = 0;
   selectedParamIndex = 0;
   lv_dropdown_set_selected(city_dropdown, selectedCityIndex);
@@ -443,15 +556,15 @@ static void create_ui()
 
   // 2. Chart (Middle)
   history_chart = lv_chart_create(t2);
-  lv_obj_set_size(history_chart, 200, 200); 
+  lv_obj_set_size(history_chart, 200, 200);
   lv_obj_align(history_chart, LV_ALIGN_CENTER, 0, 0);
-  lv_chart_set_type(history_chart, LV_CHART_TYPE_LINE); 
-  
+  lv_chart_set_type(history_chart, LV_CHART_TYPE_LINE);
+
   // Set initial range based on current selection (default is temp)
-  set_chart_range_by_parameter(selectedParamIndex); 
-  
-  lv_chart_set_point_count(history_chart, CHART_WINDOW_SIZE); 
-  
+  set_chart_range_by_parameter(selectedParamIndex);
+
+  lv_chart_set_point_count(history_chart, CHART_WINDOW_SIZE);
+
   history_series = lv_chart_add_series(history_chart, lv_palette_main(LV_PALETTE_RED), LV_CHART_AXIS_PRIMARY_Y);
 
   // 3. Slider (Bottom)
@@ -469,9 +582,11 @@ static void create_ui()
   apply_tile_colors(t3);
 
   String cityOptions;
-  for (int i = 0; i < CITY_COUNT; ++i) {
+  for (int i = 0; i < CITY_COUNT; ++i)
+  {
     cityOptions += cities[i].name;
-    if (i < CITY_COUNT - 1) cityOptions += "\n";
+    if (i < CITY_COUNT - 1)
+      cityOptions += "\n";
   }
   city_dropdown = lv_dropdown_create(t3);
   lv_dropdown_set_options(city_dropdown, cityOptions.c_str());
@@ -484,9 +599,11 @@ static void create_ui()
   lv_obj_add_event_cb(city_dropdown, settings_value_changed, LV_EVENT_VALUE_CHANGED, NULL);
 
   String paramOptions;
-  for (int i = 0; i < PARAM_COUNT; ++i) {
+  for (int i = 0; i < PARAM_COUNT; ++i)
+  {
     paramOptions += parameters[i].label;
-    if (i < PARAM_COUNT - 1) paramOptions += "\n";
+    if (i < PARAM_COUNT - 1)
+      paramOptions += "\n";
   }
   param_dropdown = lv_dropdown_create(t3);
   lv_dropdown_set_options(param_dropdown, paramOptions.c_str());
@@ -506,7 +623,7 @@ static void create_ui()
   lv_obj_add_event_cb(btn_save_default, on_save_defaults, LV_EVENT_CLICKED, NULL);
 
   btn_reset_defaults = lv_btn_create(t3);
-  lv_obj_align(btn_reset_defaults, LV_ALIGN_BOTTOM_RIGHT, -10, -50); 
+  lv_obj_align(btn_reset_defaults, LV_ALIGN_BOTTOM_RIGHT, -10, -50);
   lv_obj_set_width(btn_reset_defaults, 160);
   lv_obj_t *lbl_reset = lv_label_create(btn_reset_defaults);
   lv_label_set_text(lbl_reset, "Reset Default");
@@ -529,33 +646,49 @@ static void create_ui()
 // ... (Rest of the standard fetch functions and Allocator) ...
 static bool fetchJsonFromServer(const String &url, JsonDocument &doc)
 {
-  if (WiFi.status() != WL_CONNECTED) { Serial.println("[HTTP] Error: Wi-Fi not connected."); return false; }
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    Serial.println("[HTTP] Error: Wi-Fi not connected.");
+    return false;
+  }
   Serial.printf("[HTTP] Fetching URL: %s\n", url.c_str());
   HTTPClient http;
   http.useHTTP10(true);
   http.setTimeout(10000);
-  if (http.begin(url)) {
+  if (http.begin(url))
+  {
     http.addHeader("Accept-Encoding", "identity");
     int httpCode = http.GET();
-    if (httpCode == HTTP_CODE_OK) {
+    if (httpCode == HTTP_CODE_OK)
+    {
       Stream &stream = http.getStream();
       DeserializationError error = deserializeJson(doc, stream);
-      http.end(); 
-      if (error) { Serial.print("[JSON] deserializeJson() failed: "); Serial.println(error.c_str()); return false; }
+      http.end();
+      if (error)
+      {
+        Serial.print("[JSON] deserializeJson() failed: ");
+        Serial.println(error.c_str());
+        return false;
+      }
       Serial.println("[JSON] Parse successful.");
-      return true; 
-    } else {
+      return true;
+    }
+    else
+    {
       Serial.printf("[HTTP] GET failed, error: %s\n", http.errorToString(httpCode).c_str());
       http.end();
       return false;
     }
-  } else {
+  }
+  else
+  {
     Serial.printf("[HTTP] Unable to connect to %s\n", url.c_str());
     return false;
   }
 }
 
-struct SpiRamAllocator {
+struct SpiRamAllocator
+{
   void *allocate(size_t size) { return ps_malloc(size); }
   void deallocate(void *pointer) { free(pointer); }
   void *reallocate(void *ptr, size_t new_size) { return ps_realloc(ptr, new_size); }
@@ -565,23 +698,39 @@ using SpiRamJsonDocument = BasicJsonDocument<SpiRamAllocator>;
 
 bool fetchForcast(int c)
 {
-  if (WiFi.status() != WL_CONNECTED) { return false; }
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    return false;
+  }
   SpiRamJsonDocument doc(200000);
   String forecastUrl = "https://opendata-download-metfcst.smhi.se/api/category/snow1g/version/1/geotype/point/lon/";
-  forecastUrl += cities[c].lon; forecastUrl += "/lat/"; forecastUrl += cities[c].lat; forecastUrl += "/data.json";
+  forecastUrl += cities[c].lon;
+  forecastUrl += "/lat/";
+  forecastUrl += cities[c].lat;
+  forecastUrl += "/data.json";
   Serial.printf("Fetching Forecast for %s...\n", cities[c].name);
-  if (fetchJsonFromServer(forecastUrl, doc)) {
+  if (fetchJsonFromServer(forecastUrl, doc))
+  {
     JsonArray hours = doc["timeSeries"].as<JsonArray>();
-    int skip = 0; int next_day = 0;
-    for (JsonVariant hour : hours) {
-      if (skip < 12) { skip++; continue; }
+    int skip = 0;
+    int next_day = 0;
+    for (JsonVariant hour : hours)
+    {
+      if (skip < 12)
+      {
+        skip++;
+        continue;
+      }
       const char *time = hour["time"].as<const char *>();
-      if (time != nullptr) {
-        if (is_it_twelve(time) && next_day < 7) {
+      if (time != nullptr)
+      {
+        if (is_it_twelve(time) && next_day < 7)
+        {
           ForcastHourlyWeather &hourly = cities[c].forecast[next_day];
           hourly.temperature = hour["data"]["air_temperature"].as<float>();
           hourly.weatherCondition = WeatherCondition(hour["data"]["symbol_code"].as<int>());
-          strncpy(hourly.time, time, 20); hourly.time[20] = '\0';
+          strncpy(hourly.time, time, 20);
+          hourly.time[20] = '\0';
           next_day++;
         }
       }
@@ -594,16 +743,25 @@ bool fetchForcast(int c)
 
 bool fetchHistorical(int c, int p)
 {
-  if (WiFi.status() != WL_CONNECTED) { return false; }
+  if (WiFi.status() != WL_CONNECTED)
+  {
+    return false;
+  }
   SpiRamJsonDocument doc(200000);
   String histUrl = "https://opendata-download-metobs.smhi.se/api/version/1.0/parameter/";
-  histUrl += parameters[p].apiCode; histUrl += "/station/"; histUrl += cities[c].stationID; histUrl += "/period/latest-months/data.json";
+  histUrl += parameters[p].apiCode;
+  histUrl += "/station/";
+  histUrl += cities[c].stationID;
+  histUrl += "/period/latest-months/data.json";
   Serial.printf("Fetching History (%s) for %s...\n", parameters[p].label, cities[c].name);
-  if (fetchJsonFromServer(histUrl, doc)) {
+  if (fetchJsonFromServer(histUrl, doc))
+  {
     JsonArray days = doc["value"].as<JsonArray>();
     int idx = 0;
-    for (JsonVariant day : days) {
-      if (idx >= HistoricalSeries::MAX_HOURS) break;
+    for (JsonVariant day : days)
+    {
+      if (idx >= HistoricalSeries::MAX_HOURS)
+        break;
       cities[c].history[p].values[idx] = day["value"].as<float>();
       idx++;
     }
@@ -617,23 +775,32 @@ bool fetchHistorical(int c, int p)
 
 void setup()
 {
-  for (int i = 0; i < CITY_COUNT; ++i) {
-    for (int j = 0; j < PARAM_COUNT; ++j) {
+  for (int i = 0; i < CITY_COUNT; ++i)
+  {
+    for (int j = 0; j < PARAM_COUNT; ++j)
+    {
       cities[i].history[j].values = (float *)ps_malloc(HistoricalSeries::MAX_HOURS * sizeof(float));
-      if (cities[i].history[j].values == nullptr) {
+      if (cities[i].history[j].values == nullptr)
+      {
         Serial.println("FATAL: Failed to allocate historical data memory!");
-        while (true); 
+        while (true)
+          ;
       }
     }
   }
   Serial.begin(115200);
   delay(200);
 
-  if (!amoled.begin()) { Serial.println("Failed to init LilyGO AMOLED."); while (true) delay(1000); }
+  if (!amoled.begin())
+  {
+    Serial.println("Failed to init LilyGO AMOLED.");
+    while (true)
+      delay(1000);
+  }
   beginLvglHelper(amoled);
   get_saved_preferences();
   create_ui();
-  
+
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.printf("Connecting to WiFi SSID: %s\n", WIFI_SSID);
@@ -642,14 +809,32 @@ void setup()
 
 void loop()
 {
-  lv_timer_handler(); 
-  if (millis() - last_wifi_update > 500) { update_wifi_status(); last_wifi_update = millis(); }
+  if (ui_updated)
+  {
+    update_ui();
+    ui_updated = false;
+  }
+
+  lv_timer_handler();
+  if (millis() - last_wifi_update > 500)
+  {
+    update_wifi_status();
+    last_wifi_update = millis();
+  }
 
   // Re-fetch data if the user changes city or parameter
-  if (cities[selectedCityIndex].loaded_forcast != true) {
-    if (fetchForcast(selectedCityIndex)) { update_ui(); }
+  if (cities[selectedCityIndex].loaded_forcast != true)
+  {
+    if (fetchForcast(selectedCityIndex))
+    {
+      update_ui();
+    }
   }
-  if (cities[selectedCityIndex].loaded_historical[selectedParamIndex] != true) {
-    if (fetchHistorical(selectedCityIndex, selectedParamIndex)) { update_ui(); }
+  if (cities[selectedCityIndex].loaded_historical[selectedParamIndex] != true)
+  {
+    if (fetchHistorical(selectedCityIndex, selectedParamIndex))
+    {
+      update_ui();
+    }
   }
 }
