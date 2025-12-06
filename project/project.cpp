@@ -10,8 +10,8 @@
 #include <time.h>
 
 // Wi-Fi credentials
-static const char *WIFI_SSID = "BTH_Guest";
-static const char *WIFI_PASSWORD = "paprika45svart";
+static const char *WIFI_SSID = "";
+static const char *WIFI_PASSWORD = "";
 
 LilyGo_Class amoled;
 
@@ -209,7 +209,7 @@ struct HistoricalSeries
 {
   static constexpr int MAX_HOURS = 4000;
   float *values = nullptr;
-  char **timestamps = nullptr; // To store full timestamps
+  unsigned long long *timestamps = nullptr;
   int count = 0;
   bool isLoaded = false;
 };
@@ -282,23 +282,38 @@ static void update_wifi_status()
 }
 
 // Helper to format timestamp string into "YYYY-MM-DD HH:00"
-void formatTimestamp(const char *timestamp, char *output, size_t outputSize)
+void formatTimestamp(unsigned long long timestamp, char *output, size_t outputSize)
 {
-    if (strlen(timestamp) < 16) { 
+    // 1. Basic Validation: If timestamp is 0, consider it empty
+    if (timestamp == 0) { 
         snprintf(output, outputSize, "No Data"); 
         return; 
     }
-    // Expected format: YYYY-MM-DDTHH:MM:SSZ
-    int year, month, day, hour, minute;
-    // Extracting Year, Month, Day, Hour, Minute
-    if (sscanf(timestamp, "%d-%d-%dT%d:%d", &year, &month, &day, &hour, &minute) == 5) {
-        // We only care about the hour, rounding minute down to 00
-        snprintf(output, outputSize, "%d-%02d-%02d %02d:00", year, month, day, hour);
-    } else {
-        snprintf(output, outputSize, "Invalid Time");
-    }
-}
 
+    
+    timestamp = timestamp / 1000; 
+
+    // 2. Convert integer to time_t (standard C time type)
+    time_t rawTime = (time_t)timestamp;
+
+    // 3. Convert time_t to a struct tm (broken-down time: year, month, etc.)
+    // We use gmtime for UTC to match your previous "Z" (Zulu/UTC) logic.
+    // If you have configured the ESP32 timezone and want local time, use localtime(&rawTime) instead.
+    struct tm *timeInfo = gmtime(&rawTime);
+
+    if (timeInfo == nullptr) {
+        snprintf(output, outputSize, "Invalid Time");
+        return;
+    }
+
+    // 4. Format the output
+    // tm_year is years since 1900, tm_mon is 0-11
+    snprintf(output, outputSize, "%04d-%02d-%02d %02d:00", 
+             timeInfo->tm_year + 1900, 
+             timeInfo->tm_mon + 1, 
+             timeInfo->tm_mday, 
+             timeInfo->tm_hour);
+}
 
 void formatDate(const char *timestamp, char *output, size_t outputSize)
 {
@@ -388,7 +403,7 @@ void update_history_view(int slider_index)
   HistoricalSeries &current_history = cities[selectedCityIndex].history[selectedParamIndex];
   int total_count = current_history.count;
   float *values = current_history.values;
-  char **timestamps = current_history.timestamps;
+  unsigned long long *timestamps = current_history.timestamps;
 
   // Bounds check
   if (slider_index < 0)
@@ -404,12 +419,8 @@ void update_history_view(int slider_index)
   lv_label_set_text(history_info_label, buf);
 
   // 2. Update the Date/Time Label
-  char time_buf[32];
-  if (timestamps != nullptr && timestamps[slider_index] != nullptr) {
-      formatTimestamp(timestamps[slider_index], time_buf, sizeof(time_buf));
-  } else {
-      snprintf(time_buf, sizeof(time_buf), "Timestamp N/A");
-  }
+  char time_buf[64];
+  formatTimestamp(timestamps[slider_index], time_buf, sizeof(time_buf));
   lv_label_set_text(history_datetime_label, time_buf);
 
   // 3. Update the Chart
@@ -509,11 +520,6 @@ void settings_value_changed(lv_event_t *e)
   if (obj == city_dropdown)
   {
     selectedCityIndex = lv_dropdown_get_selected(obj);
-    // Clear historical flags for the new city
-    for(int i = 0; i < PARAM_COUNT; ++i) {
-        cities[selectedCityIndex].loaded_historical[i] = false;
-    }
-    cities[selectedCityIndex].loaded_forcast = false;
     lv_label_set_text(settings_status_label, "City selected - updating UI...");
   }
   else if (obj == param_dropdown)
@@ -843,15 +849,6 @@ bool fetchHistorical(int c, int p)
   {
     HistoricalSeries &current_history = cities[c].history[p];
 
-    // Allocate memory for timestamps (30 chars max including null terminator)
-    if (current_history.timestamps == nullptr) {
-        current_history.timestamps = (char **)ps_malloc(HistoricalSeries::MAX_HOURS * sizeof(char *));
-        if (current_history.timestamps == nullptr) {
-            Serial.println("FATAL: Failed to allocate timestamp pointers!");
-            return false;
-        }
-    }
-
     JsonArray days = doc["value"].as<JsonArray>();
     int idx = 0;
     for (JsonVariant day : days)
@@ -859,29 +856,17 @@ bool fetchHistorical(int c, int p)
       if (idx >= HistoricalSeries::MAX_HOURS)
         break;
 
-      // Ensure timestamp memory is allocated for this point
-      if (current_history.timestamps[idx] == nullptr) {
-          current_history.timestamps[idx] = (char *)ps_malloc(30 * sizeof(char));
-          if (current_history.timestamps[idx] == nullptr) {
-              Serial.printf("FATAL: Failed to allocate memory for timestamp index %d!\n", idx);
-              break;
-          }
-      }
-
       current_history.values[idx] = day["value"].as<float>();
-      const char *timestamp_str = day["date"].as<const char *>();
-      if (timestamp_str) {
-          strncpy(current_history.timestamps[idx], timestamp_str, 29);
-          current_history.timestamps[idx][29] = '\0';
-      } else {
-          current_history.timestamps[idx][0] = '\0';
-      }
+
+      // 1755226800000
+      current_history.timestamps[idx] = day["date"].as<unsigned long long>();
       
       idx++;
     }
     current_history.count = idx;
     current_history.isLoaded = true;
     cities[c].loaded_historical[p] = true;
+    
     return true;
   }
   return false;
@@ -895,13 +880,15 @@ void setup()
     {
       // Allocate values array
       cities[i].history[j].values = (float *)ps_malloc(HistoricalSeries::MAX_HOURS * sizeof(float));
-      if (cities[i].history[j].values == nullptr)
+      cities[i].history[j].timestamps = (unsigned long long *)ps_malloc(HistoricalSeries::MAX_HOURS * sizeof(unsigned long long));
+
+      if (cities[i].history[j].values == nullptr || cities[i].history[j].timestamps == nullptr)
       {
         Serial.println("FATAL: Failed to allocate historical data memory!");
         while (true)
           ;
       }
-      // Timestamps will be allocated in fetchHistorical now
+      
     }
   }
   Serial.begin(115200);
