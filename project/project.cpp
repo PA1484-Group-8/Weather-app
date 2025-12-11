@@ -10,8 +10,8 @@
 #include <time.h>
 
 // Wi-Fi credentials
-static const char *WIFI_SSID = "";
-static const char *WIFI_PASSWORD = "";
+static const char *WIFI_SSID = "BTH_Guest";
+static const char *WIFI_PASSWORD = "plommon86silver";
 
 LilyGo_Class amoled;
 
@@ -552,6 +552,7 @@ static void on_reset_deaults(lv_event_t *e)
   preferences.end();
   lv_label_set_text(settings_status_label, "Defaults reset.");
   Serial.println("Preferences cleared and UI reset.");
+  update_ui();
 }
 
 static void get_saved_preferences()
@@ -603,7 +604,7 @@ static void create_ui()
   lv_obj_set_style_bg_color(t0, lv_color_black(), 0);
   lv_obj_set_style_bg_opa(t0, LV_OPA_COVER, 0);
   t0_label = lv_label_create(t0);
-  lv_label_set_text(t0_label, "Group 8\nFirmware v1.2.0");
+  lv_label_set_text(t0_label, "Group 8\nFirmware v8.0");
   lv_obj_set_style_text_font(t0_label, &montserrat_se_28, 0);
   lv_obj_set_style_text_color(t0_label, lv_color_white(), 0);
   lv_obj_center(t0_label);
