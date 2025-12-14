@@ -49,7 +49,7 @@ Before you begin, make sure you have:
 
 Follow these instructions to build and run the system on the ESP32.
 
-### Prepeare the device
+### Prepare the device
 
 Set device in download mode:
 1. Press BOOT + RST
