@@ -29,8 +29,7 @@ Before you begin, make sure you have:
 
 -   **Visual Studio Code** installed
 -   **PlatformIO extension** installed in VS Code
--   An **ESP32 board**
--   A **compatible touchscreen display**
+-   An **ESP32-T4-S3 LilyGO**
 -   USB cable for flashing the microcontroller
 -   Internet connection (required for fetching SMHI data)
 
