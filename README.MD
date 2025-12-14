@@ -58,7 +58,7 @@ Set device in download mode:
 
 **You need to do this every time before you press UPLOAD**
 
-![[screenshot](./assets/screenshot.png)](./assets/screenshot2.png)
+<img src="./assets/screenshot.png" alt="Screenshot" width="500">
 
 ### Building and uploading
 
