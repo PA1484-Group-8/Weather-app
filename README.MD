@@ -55,6 +55,7 @@ Set device in download mode:
 1. Press BOOT + RST
 2. Release RST
 3. Release BOOT
+
 **You need to do this every time before you press UPLOAD**
 
 ![[screenshot](./assets/screenshot.png)](./assets/screenshot2.png)
