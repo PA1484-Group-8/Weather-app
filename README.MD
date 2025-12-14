@@ -1,8 +1,8 @@
-# README.md
+# ESP32-T4-S3 LilyGO
 
 ## Introduction
 
-This project is a weather station system built using an **ESP32**, a
+This project is a weather station system built using an **ESP32-T4-S3 LilyGO**, a
 **touchscreen display**, and data fetched from the **SMHI weather
 API**.
 The purpose of the system is to give users an easy and interactive way
