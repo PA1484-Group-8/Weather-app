@@ -56,7 +56,7 @@ Set device in download mode:
 2. Release RST
 3. Release BOOT
 
-**You need to do this every time before you press UPLOAD**
+You **NEED** to do this every time before you press **UPLOAD**
 
 <img src="./assets/screenshot2.png" alt="Screenshot" width="500">
 
