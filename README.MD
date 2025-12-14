@@ -28,6 +28,7 @@ machine and prepare the ESP32.
 Before you begin, make sure you have:
 
 -   **Visual Studio Code** installed
+-   **Python** installed on the computer
 -   **PlatformIO extension** installed in VS Code
 -   An **ESP32-T4-S3 LilyGO**
 -   USB cable for flashing the microcontroller
@@ -35,12 +36,22 @@ Before you begin, make sure you have:
 
 ### Installation
 
-1.  Clone or download the project folder to your computer.
-2.  Open the folder in **Visual Studio Code**.
-3.  Ensure PlatformIO automatically detects the project.
-4.  Install all required libraries (PlatformIO will usually prompt
-    you).
-5.  Connect your ESP32 to the computer via USB.
+1. Clone the project:
+   git clone https://github.com/PA1484-Group-8/Weather-app
+
+2. Install Visual Studio Code:
+   https://code.visualstudio.com/
+
+3. Install Python:
+   https://www.python.org/
+
+4. Open Visual Studio Code and install the **PlatformIO** extension from the Extensions view.
+
+5. Open the project folder in **Visual Studio Code**.
+
+6. Wait for PlatformIO to automatically detect the project and install all required dependencies.
+
+7. Connect your ESP32 to the computer via USB.
 
 ------------------------------------------------------------------------
 
@@ -59,11 +70,22 @@ You **NEED** to do this every time before you press **UPLOAD**
 
 <img src="./assets/screenshot2.png" alt="Screenshot" width="500">
 
-### Building and uploading
+### Building and Uploading
 
-1.  In VS Code, open the PlatformIO sidebar.
-2.  Select **Build** to compile the project.
-3.  Select **Upload** to flash the compiled program to your ESP32.
+1. In Visual Studio Code, go to **File → Open Folder** and select the **Weather-app** project directory.
+
+2. Wait for all third-party dependency libraries to finish installing.
+
+3. Click the **✓** icon in the lower-left corner (or **Build** in the PlatformIO sidebar) to compile the project.
+
+4. Connect the board to the computer via USB.
+
+5. Prepare the device for flashing  
+   ([see instructions](#prepare-the-device)).
+
+6. Click the **→** icon (or **Upload** in the PlatformIO sidebar) to flash the firmware to the ESP32.
+
+7. Restart the device after the upload is complete.
 
 ### Startup procedure
 
