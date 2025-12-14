@@ -49,6 +49,16 @@ Before you begin, make sure you have:
 
 Follow these instructions to build and run the system on the ESP32.
 
+### Prepeare the device
+
+Set device in download mode:
+1. Press BOOT + RST
+2. Release RST
+3. Release BOOT
+**You need to do this every time before you press UPLOAD**
+
+![[screenshot](./assets/screenshot.png)](./assets/screenshot2.png)
+
 ### Building and uploading
 
 1.  In VS Code, open the PlatformIO sidebar.
