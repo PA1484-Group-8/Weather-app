@@ -758,7 +758,7 @@ static void create_ui()
 
   // Previous Parameter Button (Left)
   forecast_prev_btn = lv_btn_create(t1);
-  lv_obj_set_size(forecast_prev_btn, 60, 60);
+  lv_obj_set_size(forecast_prev_btn, 150, 60);
   lv_obj_align(forecast_prev_btn, LV_ALIGN_BOTTOM_LEFT, 10, -10);
   lv_obj_t *lbl_prev = lv_label_create(forecast_prev_btn);
   lv_label_set_text(lbl_prev, "Previous");
@@ -793,7 +793,7 @@ lv_obj_add_flag(forecast_param_icon, LV_OBJ_FLAG_HIDDEN);
 
   // Next Parameter Button (Right)
   forecast_next_btn = lv_btn_create(t1);
-  lv_obj_set_size(forecast_next_btn, 60, 60);
+  lv_obj_set_size(forecast_next_btn, 150, 60);
   lv_obj_align(forecast_next_btn, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
   lv_obj_t *lbl_next = lv_label_create(forecast_next_btn);
   lv_label_set_text(lbl_next, "Next");
