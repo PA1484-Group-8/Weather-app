@@ -8,10 +8,14 @@
 #include <WiFi.h>
 #include <lvgl.h>
 #include <time.h>
+#include "E0B3_black.h"
+#include "icon_humidity.h"
+#include "icon_wind_speed.h"
+#include "icon_air_pressure.h"
 
 // Wi-Fi credentials
-static const char *WIFI_SSID = "BTH_Guest";
-static const char *WIFI_PASSWORD = "plommon86silver";
+static const char *WIFI_SSID = "Sermed";
+static const char *WIFI_PASSWORD = "12345678";
 
 LilyGo_Class amoled;
 
@@ -25,6 +29,8 @@ static lv_obj_t *t4; // Wifi
 static lv_obj_t *t0_label;
 static lv_obj_t *t1_label;
 
+static lv_obj_t *forecast_param_icon; // Icon for current forecast parameter
+
 // --- HISTORICAL DATA WIDGETS (For t2) ---
 static lv_obj_t *history_chart;
 static lv_chart_series_t *history_series;
@@ -33,6 +39,13 @@ static lv_obj_t *history_location_label; // Shows the selected city name
 static lv_obj_t *history_info_label;     // Shows parameter and value
 static lv_obj_t *history_datetime_label; // Shows the date/time of the slider position
 static const int CHART_WINDOW_SIZE = 24; // Show 24 hours at a time
+
+// --- FORECAST WIDGETS (For t1) ---
+static lv_obj_t *forecast_container;  // Container for forecast cards
+static lv_obj_t *forecast_param_label; // Shows current selected parameter
+static lv_obj_t *forecast_prev_btn;    // Button to switch to previous parameter
+static lv_obj_t *forecast_next_btn;    // Button to switch to next parameter
+static int forecastDisplayParamIndex = 0; // Which parameter to display (0-3)
 
 static lv_obj_t *t4_label;
 
@@ -190,14 +203,75 @@ const char *getWeatherString(WeatherCondition symbol)
   }
 }
 
+// Helper function to get parameter symbol
+const char *getParameterSymbol(int paramIndex)
+{
+  switch (paramIndex)
+  {
+  case 0: // Temperature
+    return "🌡";
+  case 1: // Humidity
+    return "💧";
+  case 2: // Wind speed
+    return "💨";
+  case 3: // Air pressure
+    return "🔽";
+  default:
+    return "?";
+  }
+}
+
+// Helper function to get parameter value from forecast
+// Helper function to get parameter value from forecast
+// (Implementation moved below the `ForcastHourlyWeather` definition)
+
+// Helper function to get parameter unit
+const char *getParameterUnit(int paramIndex)
+{
+  switch (paramIndex)
+  {
+  case 0: // Temperature
+    return "°C";
+  case 1: // Humidity
+    return "%";
+  case 2: // Wind speed
+    return "m/s";
+  case 3: // Air pressure
+    return "hPa";
+  default:
+    return "";
+  }
+}
+
 const int FORCAST_TIMESTAMP_SIZE = 20;
 
 struct ForcastHourlyWeather
 {
   float temperature;
+  float humidity;
+  float windSpeed;
+  float airPressure;
   char time[FORCAST_TIMESTAMP_SIZE + 1];
   WeatherCondition weatherCondition;
 };
+
+// Helper function to get parameter value from forecast
+float getForecastParameterValue(const ForcastHourlyWeather &forecast, int paramIndex)
+{
+  switch (paramIndex)
+  {
+  case 0: // Temperature
+    return forecast.temperature;
+  case 1: // Humidity
+    return forecast.humidity;
+  case 2: // Wind speed
+    return forecast.windSpeed;
+  case 3: // Air pressure
+    return forecast.airPressure;
+  default:
+    return 0.0f;
+  }
+}
 
 struct Parameter
 {
@@ -454,6 +528,21 @@ static void history_slider_event_cb(lv_event_t *e)
   update_history_view(value);
 }
 
+// Callback for Forecast Parameter Navigation
+static void forecast_prev_param_cb(lv_event_t *e)
+{
+  LV_UNUSED(e);
+  forecastDisplayParamIndex = (forecastDisplayParamIndex - 1 + PARAM_COUNT) % PARAM_COUNT;
+  ui_updated = true;
+}
+
+static void forecast_next_param_cb(lv_event_t *e)
+{
+  LV_UNUSED(e);
+  forecastDisplayParamIndex = (forecastDisplayParamIndex + 1) % PARAM_COUNT;
+  ui_updated = true;
+}
+
 /**
  * @brief Updates all UI labels with data from global variables.
  */
@@ -462,27 +551,69 @@ void update_ui()
   char buffer[2048];
   char dateStr[16];
 
-  // --- Update Tile 1: 7-Day Forecast ---
-  snprintf(buffer, sizeof(buffer), "7-Day Forecast (12:00) in %s\n\n", cities[selectedCityIndex].name);
+  // --- Update Tile 1: 7-Day Forecast with selectable parameters ---
+snprintf(buffer, sizeof(buffer),
+         "7-Day Forecast (12:00) in %s\n\n",
+         cities[selectedCityIndex].name);
 
   for (int i = 0; i < 7; i++)
   {
     formatDate(cities[selectedCityIndex].forecast[i].time, dateStr, sizeof(dateStr));
+    float paramValue = getForecastParameterValue(cities[selectedCityIndex].forecast[i], forecastDisplayParamIndex);
     char line[128];
-    snprintf(line, sizeof(line), "%s %s %.1f°C %s\n",
+    snprintf(line, sizeof(line), "%s %s %.1f%s %s\n",
              getWeatherSymbol(cities[selectedCityIndex].forecast[i].weatherCondition),
-             dateStr, cities[selectedCityIndex].forecast[i].temperature,
+             dateStr,
+             paramValue,
+             getParameterUnit(forecastDisplayParamIndex),
              getWeatherString(cities[selectedCityIndex].forecast[i].weatherCondition));
     strcat(buffer, line);
   }
   lv_label_set_text(t1_label, buffer);
-  lv_obj_center(t1_label);
+
+  lv_label_set_text(t1_label, buffer);
+  
+  // Update parameter label at the bottom
+  lv_label_set_text(forecast_param_label, parameters[forecastDisplayParamIndex].label);
+  const lv_img_dsc_t *icon = nullptr;
+
+switch (forecastDisplayParamIndex)
+{
+case 0: // Temperature
+    icon = &E0B3_black;
+    break;
+case 1: // Humidity
+    icon = &icon_humidity;
+    break;
+case 2: // Wind speed
+    icon = &icon_wind_speed;
+    break;
+case 3: // Air pressure
+    icon = &icon_air_pressure;
+    break;
+}
+
+if (icon) {
+    lv_img_set_src(forecast_param_icon, icon);
+    lv_obj_clear_flag(forecast_param_icon, LV_OBJ_FLAG_HIDDEN);
+} else {
+    lv_obj_add_flag(forecast_param_icon, LV_OBJ_FLAG_HIDDEN);
+}
 
   // --- Update Tile 2 (Historical Data) ---
   int count = cities[selectedCityIndex].history[selectedParamIndex].count;
   
   // 1. Update Location Label
   lv_label_set_text(history_location_label, cities[selectedCityIndex].name);
+
+  lv_obj_align_to(
+    forecast_param_icon,
+    forecast_param_label,
+    LV_ALIGN_OUT_LEFT_MID,
+    -6,
+    0
+);
+
 
   // Always update chart range based on the currently selected parameter
   set_chart_range_by_parameter(selectedParamIndex);
@@ -610,11 +741,65 @@ static void create_ui()
   lv_obj_center(t0_label);
 
   // Tile #1 - 7-Day Forecast
-  t1_label = lv_label_create(t1);
+  apply_tile_colors(t1);
+
+  // Forecast display container
+  forecast_container = lv_obj_create(t1);
+  lv_obj_set_size(forecast_container, lv_pct(100), lv_pct(80));
+  lv_obj_align(forecast_container, LV_ALIGN_TOP_MID, 0, 50);
+  lv_obj_set_style_bg_opa(forecast_container, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(forecast_container, 0, 0);
+  
+  // Forecast label
+  t1_label = lv_label_create(forecast_container);
   lv_label_set_text(t1_label, "Forecast data: Loading...");
   lv_obj_set_style_text_font(t1_label, &montserrat_se_28, 0);
-  lv_obj_center(t1_label);
-  apply_tile_colors(t1);
+  lv_obj_align(t1_label, LV_ALIGN_TOP_MID, 0, 0);
+
+  // Previous Parameter Button (Left)
+  forecast_prev_btn = lv_btn_create(t1);
+  lv_obj_set_size(forecast_prev_btn, 60, 60);
+  lv_obj_align(forecast_prev_btn, LV_ALIGN_BOTTOM_LEFT, 10, -10);
+  lv_obj_t *lbl_prev = lv_label_create(forecast_prev_btn);
+  lv_label_set_text(lbl_prev, "◀");
+  lv_obj_center(lbl_prev);
+  lv_obj_set_style_text_font(lbl_prev, &montserrat_se_28, 0);
+  lv_obj_add_event_cb(forecast_prev_btn, forecast_prev_param_cb, LV_EVENT_CLICKED, NULL);
+  
+  // Parameter Label (Center Bottom)
+  forecast_param_label = lv_label_create(t1);
+  lv_label_set_text(forecast_param_label, "Temperature");
+  lv_obj_set_style_text_font(forecast_param_label, &montserrat_se_28, 0);
+  lv_obj_align(forecast_param_label, LV_ALIGN_BOTTOM_MID, 0, -10);
+  
+  // Forecast parameter icon (temperature / humidity / wind / pressure)
+forecast_param_icon = lv_img_create(t1);
+
+// Match 28px font height
+lv_img_set_zoom(forecast_param_icon, 256);
+
+// Align icon to the left of the parameter label
+lv_obj_align_to(
+    forecast_param_icon,
+    forecast_param_label,
+    LV_ALIGN_OUT_LEFT_MID,
+    -6,
+    0
+);
+
+// Hidden until update_ui() sets the correct icon
+lv_obj_add_flag(forecast_param_icon, LV_OBJ_FLAG_HIDDEN);
+
+
+  // Next Parameter Button (Right)
+  forecast_next_btn = lv_btn_create(t1);
+  lv_obj_set_size(forecast_next_btn, 60, 60);
+  lv_obj_align(forecast_next_btn, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
+  lv_obj_t *lbl_next = lv_label_create(forecast_next_btn);
+  lv_label_set_text(lbl_next, "▶");
+  lv_obj_center(lbl_next);
+  lv_obj_set_style_text_font(lbl_next, &montserrat_se_28, 0);
+  lv_obj_add_event_cb(forecast_next_btn, forecast_next_param_cb, LV_EVENT_CLICKED, NULL);
 
   // --- Tile #2 (Screen 3) - Historical Weather ---
   apply_tile_colors(t2);
@@ -820,6 +1005,9 @@ bool fetchForcast(int c)
         {
           ForcastHourlyWeather &hourly = cities[c].forecast[next_day];
           hourly.temperature = hour["data"]["air_temperature"].as<float>();
+          hourly.humidity = hour["data"]["relative_humidity"].as<float>();
+          hourly.windSpeed = hour["data"]["wind_speed"].as<float>();
+          hourly.airPressure = hour["data"]["air_pressure_at_sea_level"].as<float>();
           hourly.weatherCondition = WeatherCondition(hour["data"]["symbol_code"].as<int>());
           strncpy(hourly.time, time, 20);
           hourly.time[20] = '\0';
