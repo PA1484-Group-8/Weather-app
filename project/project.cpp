@@ -761,7 +761,7 @@ static void create_ui()
   lv_obj_set_size(forecast_prev_btn, 60, 60);
   lv_obj_align(forecast_prev_btn, LV_ALIGN_BOTTOM_LEFT, 10, -10);
   lv_obj_t *lbl_prev = lv_label_create(forecast_prev_btn);
-  lv_label_set_text(lbl_prev, "◀");
+  lv_label_set_text(lbl_prev, "Previous");
   lv_obj_center(lbl_prev);
   lv_obj_set_style_text_font(lbl_prev, &montserrat_se_28, 0);
   lv_obj_add_event_cb(forecast_prev_btn, forecast_prev_param_cb, LV_EVENT_CLICKED, NULL);
@@ -796,7 +796,7 @@ lv_obj_add_flag(forecast_param_icon, LV_OBJ_FLAG_HIDDEN);
   lv_obj_set_size(forecast_next_btn, 60, 60);
   lv_obj_align(forecast_next_btn, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
   lv_obj_t *lbl_next = lv_label_create(forecast_next_btn);
-  lv_label_set_text(lbl_next, "▶");
+  lv_label_set_text(lbl_next, "Next");
   lv_obj_center(lbl_next);
   lv_obj_set_style_text_font(lbl_next, &montserrat_se_28, 0);
   lv_obj_add_event_cb(forecast_next_btn, forecast_next_param_cb, LV_EVENT_CLICKED, NULL);
